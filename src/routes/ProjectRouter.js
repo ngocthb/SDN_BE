@@ -12,7 +12,7 @@ const { authAdminMiddleware } = require("../middleware/authMiddleware");
 
 /**
  * @swagger
- * /api/project/get-all:
+ * /get-all:
  *   get:
  *     summary: Get all projects with pagination
  *     description: Retrieve a list of all projects with optional pagination.
@@ -140,7 +140,7 @@ routerProject.get(
 
 /**
  * @swagger
- * /api/project:
+ * :
  *   post:
  *     summary: Create a new project
  *     description: Create a new project with all required fields. Admin role is required.
@@ -280,7 +280,7 @@ routerProject.post("/", authAdminMiddleware, projectController.createProject);
 
 /**
  * @swagger
- * /api/project/{id}:
+ * /{id}:
  *   get:
  *     summary: Get project by ID
  *     description: Retrieve details of a specific project by its ID.
@@ -307,7 +307,7 @@ routerProject.get(
 
 /**
  * @swagger
- * /api/project/{id}:
+ * /{id}:
  *   put:
  *     summary: Update project by ID
  *     description: Update project details by project ID. Admin role is required.

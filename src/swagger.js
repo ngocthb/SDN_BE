@@ -11,12 +11,7 @@ const options = {
     },
     servers: [
       {
-        url: "http://localhost:8080",
-        description: "Local server",
-      },
-      {
-        url: "http://ojtbe-production.up.railway.app",
-        description: "Production server",
+        url: "http://ojtbe-production.up.railway.app/api",
       },
     ],
     components: {

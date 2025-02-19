@@ -12,7 +12,7 @@ const { authUserMiddleware } = require("../middleware/authMiddleware");
 
 /**
  * @swagger
- * /api/claim:
+ * /claim:
  *   post:
  *     summary: Tạo yêu cầu bồi thường (Claim) mới
  *     description: Tạo một yêu cầu bồi thường mới cho người dùng có vai trò "Claimer".
@@ -167,7 +167,7 @@ routerClaim.post("/", authUserMiddleware, claimController.createClaim);
 
 /**
  * @swagger
- * /api/claim/download:
+ * /claim/download:
  *   get:
  *     summary: Xuất danh sách các Claim Request đã thanh toán trong tháng ra file Excel
  *     description: API này yêu cầu xác thực Bearer Token và sẽ lấy danh sách các Claim Request có trạng thái "Paid" trong tháng cụ thể rồi xuất ra file Excel.
@@ -219,7 +219,7 @@ routerClaim.get(
 
 /**
  * @swagger
- * /api/claim:
+ * /claim:
  *   get:
  *     summary: Lấy danh sách yêu cầu bồi thường
  *     description: Lấy danh sách yêu cầu bồi thường với các bộ lọc, phân trang và sắp xếp.
@@ -391,7 +391,7 @@ routerClaim.get("/", authUserMiddleware, claimController.getClaim); // claimer t
 
 /**
  * @swagger
- * /api/claim/{id}:
+ * /claim/{id}:
  *   put:
  *     summary: Cập nhật yêu cầu bồi thường
  *     description: Cập nhật thông tin yêu cầu bồi thường dựa trên vai trò của người dùng. Chỉ có role Approver mới cập nhật đc reason_approver. Role Claimer cập nhập được status sang Pending hoặc Cancelled. Role Approver cập nhật được status sang Approved hoặc Rejected. Role Finance cập nhật status sang Paid.
@@ -516,7 +516,7 @@ routerClaim.put("/:id", authUserMiddleware, claimController.updateClaim);
 
 /**
  * @swagger
- * /api/claim/{id}:
+ * /claim/{id}:
  *   get:
  *     summary: Lấy thông tin yêu cầu bồi thường
  *     description: Trả về thông tin chi tiết của một yêu cầu bồi thường dựa trên ID. Chỉ người tạo yêu cầu hoặc Admin mới có thể truy cập.

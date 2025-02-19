@@ -11,7 +11,7 @@ const AuthRouter = express.Router();
 
 /**
  * @swagger
- * /api/auth/forgot-password:
+ * /auth/forgot-password:
  *   post:
  *     summary: Gửi OTP đặt lại mật khẩu
  *     description: API gửi mã OTP 6 số về email để đặt lại mật khẩu.
@@ -55,7 +55,7 @@ AuthRouter.post("/forgot-password", AuthController.forgotPassword);
 
 /**
  * @swagger
- * /api/auth/reset-password:
+ * /auth/reset-password:
  *   post:
  *     summary: Xác thực OTP và đặt lại mật khẩu mới
  *     description: API cho phép người dùng nhập email, OTP, và mật khẩu mới để đặt lại mật khẩu.
