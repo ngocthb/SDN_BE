@@ -19,7 +19,7 @@ const {
 
 /**
  * @swagger
- * /sign-up:
+ * /user/sign-up:
  *   post:
  *     summary: Đăng ký tài khoản mới dành cho role Administrator
  *     description: |
@@ -77,7 +77,7 @@ routerUser.post("/sign-up", authAdminMiddleware, userController.createUser);
 
 /**
  * @swagger
- * /sign-in:
+ * /user/sign-in:
  *   post:
  *     summary: Đăng nhập hệ thống
  *     description: Người dùng có thể đăng nhập vào hệ thống bằng tên đăng nhập và mật khẩu.
@@ -148,7 +148,7 @@ routerUser.post("/sign-in", userController.loginUser);
 
 /**
  * @swagger
- * /update-user/{id}:
+ * /user/update-user/{id}:
  *   put:
  *     summary: Cập nhật thông tin người dùng
  *     description: Cập nhật thông tin cá nhân của người dùng. Chỉ có role là Administrator mới có thể cập nhật thông tin department, salary, rank, role , status.
@@ -247,7 +247,7 @@ routerUser.put(
 
 /**
  * @swagger
- * :
+ * /user:
  *   get:
  *     summary: Lấy thông tin người dùng từ token
  *     description: Lấy thông tin cá nhân của người dùng dựa trên token đăng nhập.
@@ -318,7 +318,7 @@ routerUser.get("/", authUserMiddleware, userController.getUserByToken);
 
 /**
  * @swagger
- * /get-all:
+ * /user/get-all:
  *   get:
  *     summary: Lấy danh sách tất cả người dùng
  *     description: Admin có thể xem danh sách tất cả người dùng với phân trang.
@@ -429,7 +429,7 @@ routerUser.get("/get-all", authAdminMiddleware, userController.getAllUser);
 
 /**
  * @swagger
- * /{id}:
+ * /user/{id}:
  *   get:
  *     summary: Lấy thông tin người dùng theo ID
  *     description: Trả về thông tin cá nhân của một người dùng cụ thể dựa trên ID. Chỉ có role là Administrator mới có thể xem thông tin người dùng.
