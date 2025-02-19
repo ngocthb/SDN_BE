@@ -15,7 +15,7 @@ const options = {
         description: "Local server",
       },
       {
-        url: "ojtbe-production.up.railway.app",
+        url: "ojtbe-production.up.railway.app/api",
         description: "Production server",
       },
     ],
