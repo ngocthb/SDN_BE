@@ -11,7 +11,7 @@ const options = {
     },
     servers: [
       {
-        url: "http://ojtbe-production.up.railway.app/api",
+        url: "https://ojtbe-production.up.railway.app/api",
       },
     ],
     components: {
