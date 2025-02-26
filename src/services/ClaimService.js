@@ -73,7 +73,9 @@ const getClaim = (role, userId, filters, page, limit, sortBy, sortOrder) => {
           );
 
           const project = await ProjectModel.findById(claim.project_id);
-
+          if (!project) {
+            throw new Error("Project not found");
+          }
           return {
             project_name: project.project_name,
             user_name: user.user_name,
@@ -107,7 +109,7 @@ const getClaim = (role, userId, filters, page, limit, sortBy, sortOrder) => {
 
       if (role === "Finance") {
         listClaimsData = listClaimsData.filter(
-          (claim) => claim.status === "Approved"
+          (claim) => claim.status === "Approved" || claim.status === "Paid"
         );
       }
 

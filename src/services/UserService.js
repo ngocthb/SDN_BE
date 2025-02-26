@@ -202,16 +202,20 @@ const updateUser = async (id, data, file, role) => {
       const regex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
       return regex.test(password);
     };
-    if (!isStrictPassword(data.password)) {
-      return {
-        status: "ERR",
-        message:
-          "Password must contain at least 8 characters, including uppercase and number",
-      };
-    }
 
-    if (data.password && data.password !== checkUser.password) {
-      data.password = bcrypt.hashSync(data.password, 10);
+    console.log(data.password);
+    if (data.password) {
+      if (!isStrictPassword(data.password)) {
+        return {
+          status: "ERR",
+          message:
+            "Password must contain at least 8 characters, including uppercase and number",
+        };
+      }
+
+      if (data.password !== checkUser.password) {
+        data.password = bcrypt.hashSync(data.password, 10);
+      }
     }
 
     const updateData = await UserModel.findByIdAndUpdate(
