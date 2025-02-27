@@ -1,7 +1,10 @@
 const express = require("express");
 const routerProject = express.Router();
 const projectController = require("../controller/ProjectController");
-const { authAdminMiddleware } = require("../middleware/authMiddleware");
+const {
+  authAdminMiddleware,
+  authUserMiddleware,
+} = require("../middleware/authMiddleware");
 
 /**
  * @swagger
@@ -9,6 +12,103 @@ const { authAdminMiddleware } = require("../middleware/authMiddleware");
  *   name: Project
  *   description: API quản lý projects
  */
+
+/**
+ * @swagger
+ * /project:
+ *   get:
+ *     summary: Get projects by user ID
+ *     description: Retrieve a list of projects that the authenticated user is assigned to.
+ *     tags: [Project]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved user projects
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "OK"
+ *                 message:
+ *                   type: string
+ *                   example: "Successfully retrieved user projects"
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     required:
+ *                       - project_name
+ *                       - duration
+ *                       - pm
+ *                       - qa
+ *                       - technical_lead
+ *                       - ba
+ *                       - developers
+ *                       - testers
+ *                       - technical_consultancy
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                         description: The project ID
+ *                       project_name:
+ *                         type: string
+ *                         description: Name of the project
+ *                       duration:
+ *                         type: object
+ *                         properties:
+ *                           from:
+ *                             type: string
+ *                             format: date
+ *                           to:
+ *                             type: string
+ *                             format: date
+ *                       pm:
+ *                         type: string
+ *                         format: uuid
+ *                         description: Project Manager's User ID
+ *                       qa:
+ *                         type: string
+ *                         format: uuid
+ *                         description: Quality Assurance's User ID
+ *                       technical_lead:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                           format: uuid
+ *                       ba:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                           format: uuid
+ *                       developers:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                           format: uuid
+ *                       testers:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                           format: uuid
+ *                       technical_consultancy:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                           format: uuid
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: No projects found for the user
+ */
+routerProject.get(
+  "/",
+  authUserMiddleware,
+  projectController.getProjectByUserId
+);
 
 /**
  * @swagger

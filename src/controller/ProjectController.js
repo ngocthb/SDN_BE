@@ -43,9 +43,20 @@ const updateProjectById = async (req, res) => {
   }
 };
 
+const getProjectByUserId = async (req, res) => {
+  try {
+    const userID = req.user.id;
+    const response = await ProjectService.getProjectByUserId(userID);
+    return res.status(200).json(response);
+  } catch (error) {
+    return res.status(404).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getAllProject,
   getProjectById,
   createProject,
   updateProjectById,
+  getProjectByUserId,
 };

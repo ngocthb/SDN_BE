@@ -99,9 +99,43 @@ const updateProjectById = async (id, data) => {
   });
 };
 
+const getProjectByUserId = async (userId) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const data = await ProjectModel.find({
+        $or: [
+          { pm: userId },
+          { qa: userId },
+          { technical_lead: { $in: [userId] } },
+          { ba: { $in: [userId] } },
+          { developers: { $in: [userId] } },
+          { testers: { $in: [userId] } },
+          { technical_consultancy: { $in: [userId] } },
+        ],
+      });
+
+      const totalProject = data.length;
+
+      if (data) {
+        resolve({
+          status: "OK",
+          message: "Successfully get project",
+          data: data,
+          total: {
+            totalProject: totalProject,
+          },
+        });
+      }
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
 module.exports = {
   getAllProject,
   createProject,
   getProjectById,
   updateProjectById,
+  getProjectByUserId,
 };

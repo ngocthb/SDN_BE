@@ -8,17 +8,6 @@ const moment = require("moment");
 const createClaim = (id, newClaim) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const createClaim = await ClaimModel.create({
-        user_id: id,
-        date: newClaim.date,
-        from: newClaim.from,
-        project_id: newClaim.project_id,
-        to: newClaim.to,
-        total_no_of_hours: newClaim.total_no_of_hours,
-        attached_file: newClaim.attached_file,
-        reason_claimer: newClaim.reason_claimer,
-      });
-
       const user = await UserModel.findById(createClaim.user_id).populate(
         "role_id",
         "name -_id"
@@ -33,6 +22,30 @@ const createClaim = (id, newClaim) => {
       if (!project) {
         throw new Error("Project not found");
       }
+
+      const userExistsInProject =
+        project.pm?.toString() === id ||
+        project.qa?.toString() === id ||
+        project.technical_lead?.some((tl) => tl.toString() === id) ||
+        project.ba?.some((b) => b.toString() === id) ||
+        project.developers?.some((dev) => dev.toString() === id) ||
+        project.testers?.some((tester) => tester.toString() === id) ||
+        project.technical_consultancy?.some((tc) => tc.toString() === id);
+
+      if (!userExistsInProject) {
+        throw new Error("User is not assigned to this project");
+      }
+
+      const createClaim = await ClaimModel.create({
+        user_id: id,
+        date: newClaim.date,
+        from: newClaim.from,
+        project_id: newClaim.project_id,
+        to: newClaim.to,
+        total_no_of_hours: newClaim.total_no_of_hours,
+        attached_file: newClaim.attached_file,
+        reason_claimer: newClaim.reason_claimer,
+      });
 
       const dataOutput = {
         user,
