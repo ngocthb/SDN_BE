@@ -5,55 +5,54 @@ const ProjectModel = require("../models/ProjectModel");
 const ExcelJS = require("exceljs");
 const moment = require("moment");
 
-const createClaim = (id, newClaim) => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const createClaim = await ClaimModel.create({
-        user_id: id,
-        date: newClaim.date,
-        from: newClaim.from,
-        project_id: newClaim.project_id,
-        to: newClaim.to,
-        total_no_of_hours: newClaim.total_no_of_hours,
-        attached_file: newClaim.attached_file,
-        reason_claimer: newClaim.reason_claimer,
-      });
-
-      const user = await UserModel.findById(createClaim.user_id).populate(
-        "role_id",
-        "name -_id"
-      );
-
-      if (!user) {
-        throw new Error("User not found");
-      }
-
-      const project = await ProjectModel.findById(createClaim.project_id);
-
-      if (!project) {
-        throw new Error("Project not found");
-      }
-
-      const dataOutput = {
-        user,
-        project,
-        ...createClaim._doc,
-      };
-
-      delete dataOutput.user_id;
-      delete dataOutput.project_id;
-
-      if (createClaim) {
-        resolve({
-          status: "OK",
-          message: "Success create claim",
-          data: dataOutput,
-        });
-      }
-    } catch (error) {
-      reject(error);
+const createClaim = async (id, newClaim) => {
+  try {
+    // Kiểm tra user_id có hợp lệ không
+    const user = await UserModel.findById(id).populate("role_id", "name -_id");
+    if (!user) {
+      throw new Error("User not found");
     }
-  });
+
+    // Kiểm tra project_id có hợp lệ không
+    const project = await ProjectModel.findById(newClaim.project_id);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    // Tạo claim sau khi kiểm tra xong
+    const createdClaim = await ClaimModel.create({
+      user_id: id,
+      date: newClaim.date,
+      from: newClaim.from,
+      project_id: newClaim.project_id,
+      to: newClaim.to,
+      total_no_of_hours: newClaim.total_no_of_hours,
+      attached_file: newClaim.attached_file,
+      reason_claimer: newClaim.reason_claimer,
+    });
+
+    // Chuẩn bị dữ liệu trả về
+    const dataOutput = {
+      user,
+      project,
+      ...createdClaim._doc,
+    };
+
+    // Xóa thông tin không cần thiết
+    delete dataOutput.user_id;
+    delete dataOutput.project_id;
+
+    return {
+      status: "OK",
+      message: "Success create claim",
+      data: dataOutput,
+    };
+  } catch (error) {
+    return {
+      status: "ERROR",
+      message: error.message,
+    };
+  }
 };
 
 const getClaim = (role, userId, filters, page, limit, sortBy, sortOrder) => {
