@@ -18,7 +18,6 @@ const claimSchema = new mongoose.Schema(
     status_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "status",
-      default: "67b0b2bc9e5c638ab1523c81",
     },
     total_no_of_hours: { type: Number, required: true },
     attached_file: { type: String, required: false },

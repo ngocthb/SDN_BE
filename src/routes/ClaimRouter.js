@@ -45,8 +45,12 @@ const { authUserMiddleware } = require("../middleware/authMiddleware");
  *                 description: Tổng số giờ làm việc.
  *               project_id:
  *                 type: string
- *                 example: "60c72b2f5f9b8d3c29b1f6d5"
+ *                 example: "67b53cc84da1f1728f610095"
  *                 description: ID của dự án mà yêu cầu bồi thường liên quan.
+ *               status:
+ *                 type: string
+ *                 example: "Draft"
+ *                 description: Trạng thái của yêu cầu bồi thường (Draft, Pending).
  *               attached_file:
  *                 type: string
  *                 format: binary

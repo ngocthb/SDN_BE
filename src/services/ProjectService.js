@@ -1,40 +1,59 @@
 const ProjectModel = require("../models/ProjectModel");
 
-const getAllProject = async (page, limit) => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      let data = await ProjectModel.find();
+const getAllProject = async (page = 1, limit = 10) => {
+  try {
+    let totalProject = await ProjectModel.countDocuments();
 
-      if (!data) {
-        resolve({
-          status: "ERR",
-          message: "Project does not exist",
-        });
-      }
-
-      const totalProject = data.length;
-      if (limit && page) {
-        data = data.slice((page - 1) * limit, page * limit);
-      }
-
-      const dataOutput = {
-        projects: data,
-        total: {
-          currentPage: page || 1,
-          totalProject: totalProject,
-          totalPage: Math.ceil(totalProject / limit) || 1,
-          totalAllProject: data.length,
-        },
+    if (totalProject === 0) {
+      return {
+        status: "ERR",
+        message: "No projects found",
       };
-      resolve({
-        status: "OK",
-        message: "Successfully get all project",
-        data: dataOutput,
-      });
-    } catch (error) {
-      reject(error);
     }
-  });
+
+    let projects = await ProjectModel.find()
+      .populate("pm", "user_name")
+      .populate("qa", "user_name")
+      .populate({
+        path: "technical_lead",
+        select: "user_name",
+      })
+      .populate({
+        path: "ba",
+        select: "user_name",
+      })
+      .populate({
+        path: "developers",
+        select: "user_name",
+      })
+      .populate({
+        path: "testers",
+        select: "user_name",
+      })
+      .populate({
+        path: "technical_consultancy",
+        select: "user_name",
+      })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(); // Tăng hiệu suất
+
+    return {
+      status: "OK",
+      message: "Successfully retrieved all projects",
+      data: {
+        projects,
+        total: {
+          currentPage: page,
+          totalProject,
+          totalPage: Math.ceil(totalProject / limit) || 1,
+          totalAllProject: projects.length,
+        },
+      },
+    };
+  } catch (error) {
+    throw error;
+  }
 };
 
 const createProject = async (data) => {

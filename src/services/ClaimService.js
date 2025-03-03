@@ -7,19 +7,26 @@ const moment = require("moment");
 
 const createClaim = async (id, newClaim) => {
   try {
-    // Kiểm tra user_id có hợp lệ không
     const user = await UserModel.findById(id).populate("role_id", "name -_id");
     if (!user) {
       throw new Error("User not found");
     }
 
-    // Kiểm tra project_id có hợp lệ không
     const project = await ProjectModel.findById(newClaim.project_id);
     if (!project) {
       throw new Error("Project not found");
     }
 
-    // Tạo claim sau khi kiểm tra xong
+    let status;
+    if (newClaim.status === "Pending" || newClaim.status === "Draft") {
+      status = await StatusModel.findOne({ name: newClaim.status });
+      if (!status) {
+        throw new Error("Status not found");
+      }
+    } else if (newClaim.status) {
+      throw new Error("You are not allowed to update this status");
+    }
+
     const createdClaim = await ClaimModel.create({
       user_id: id,
       date: newClaim.date,
@@ -29,16 +36,15 @@ const createClaim = async (id, newClaim) => {
       total_no_of_hours: newClaim.total_no_of_hours,
       attached_file: newClaim.attached_file,
       reason_claimer: newClaim.reason_claimer,
+      status_id: status._id,
     });
 
-    // Chuẩn bị dữ liệu trả về
     const dataOutput = {
       user,
       project,
       ...createdClaim._doc,
     };
 
-    // Xóa thông tin không cần thiết
     delete dataOutput.user_id;
     delete dataOutput.project_id;
 

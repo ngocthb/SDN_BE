@@ -29,9 +29,9 @@ const createClaim = async (req, res) => {
         .json({ status: "ERR", message: "You are not allowed to access" });
     }
 
-    const { date, from, to, total_no_of_hours, project_id } = req.body;
+    const { date, from, to, total_no_of_hours, project_id, status } = req.body;
 
-    if (!date || !from || !to || !total_no_of_hours || !project_id) {
+    if (!date || !from || !to || !total_no_of_hours || !project_id || !status) {
       return res
         .status(200)
         .json({ status: "ERR", message: "All fields are required" });
