@@ -3,10 +3,11 @@ const ProjectModel = require("../models/ProjectModel");
 
 const getAllProject = async (req, res) => {
   try {
-    const { page, limit } = req.query;
+    const { page, limit, search } = req.query;
     const response = await ProjectService.getAllProject(
       parseInt(page),
-      parseInt(limit)
+      parseInt(limit),
+      search
     );
     return res.status(200).json(response);
   } catch (error) {

@@ -1,6 +1,6 @@
 const ProjectModel = require("../models/ProjectModel");
 
-const getAllProject = async (page = 1, limit = 10) => {
+const getAllProject = async (page, limit, search) => {
   try {
     let totalProject = await ProjectModel.countDocuments();
 
@@ -33,10 +33,19 @@ const getAllProject = async (page = 1, limit = 10) => {
       .populate({
         path: "technical_consultancy",
         select: "user_name",
-      })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .lean(); // Tăng hiệu suất
+      });
+
+    if (limit && page) {
+      projects = projects.slice((page - 1) * limit, page * limit);
+    }
+
+    if (search) {
+      projects = projects.filter((project) => {
+        return project.project_name
+          .toLowerCase()
+          .includes(search.toLowerCase());
+      });
+    }
 
     return {
       status: "OK",
@@ -44,7 +53,7 @@ const getAllProject = async (page = 1, limit = 10) => {
       data: {
         projects,
         total: {
-          currentPage: page,
+          currentPage: page || 1,
           totalProject,
           totalPage: Math.ceil(totalProject / limit) || 1,
           totalAllProject: projects.length,
