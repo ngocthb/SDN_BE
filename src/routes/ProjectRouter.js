@@ -134,6 +134,13 @@ routerProject.get(
  *           type: integer
  *           example: 10
  *         description: The number of projects per page for pagination.
+ *       - in: query
+ *         name: search
+ *         required: false
+ *         schema:
+ *           type: string
+ *           example: "project name"
+ *           description: Search for a project by name.
  *     responses:
  *       200:
  *         description: Successfully retrieved projects
