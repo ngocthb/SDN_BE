@@ -130,7 +130,7 @@ const updateProjectById = async (id, data) => {
 const getProjectByUserId = async (userId) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const data = await ProjectModel.find({
+      let data = await ProjectModel.find({
         $or: [
           { pm: userId },
           { qa: userId },
@@ -140,6 +140,10 @@ const getProjectByUserId = async (userId) => {
           { testers: { $in: [userId] } },
           { technical_consultancy: { $in: [userId] } },
         ],
+      });
+
+      data.filter((project) => {
+        return project.status === true;
       });
 
       const totalProject = data.length;

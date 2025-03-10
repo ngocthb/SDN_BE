@@ -117,6 +117,37 @@ const updateClaim = async (req, res) => {
   }
 };
 
+const updateListClaims = async (req, res) => {
+  try {
+    const claimIds = req.body.claimIds;
+    const status = req.body.status;
+    const reason = req.body.reason;
+    const userID = req.user.id;
+    const role = await checkRole(userID);
+    if (role.status === "ERR") {
+      return res.status(200).json({ status: "ERR", message: role.message });
+    }
+    if (role.role === "Claimer") {
+      const response = await claimServices.updateListClaimForClaimer(
+        userID,
+        claimIds,
+        status
+      );
+      return res.status(200).json(response);
+    } else {
+      const response = await claimServices.updateListClaimForOtherRole(
+        role.role,
+        claimIds,
+        status,
+        reason
+      );
+      return res.status(200).json(response);
+    }
+  } catch (error) {
+    return res.status(404).json({ message: error.message });
+  }
+};
+
 const getClaimById = async (req, res) => {
   try {
     const claimId = req.params.id;
@@ -192,4 +223,5 @@ module.exports = {
   updateClaim,
   getClaimById,
   downloadPaidClaims,
+  updateListClaims,
 };

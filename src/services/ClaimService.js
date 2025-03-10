@@ -289,6 +289,73 @@ const updateClaimForClaimer = async (userId, claimId, updateClaim) => {
   }
 };
 
+const updateListClaimForClaimer = async (userID, claimIds, status) => {
+  try {
+    const claims = await ClaimModel.find({ _id: { $in: claimIds } }).populate(
+      "status_id"
+    );
+
+    if (!claims.length) {
+      throw new Error("No claims found");
+    }
+
+    // Kiểm tra quyền của user trên tất cả claims
+    const unauthorizedClaims = claims.filter(
+      (claim) => claim.user_id.toString() !== userID
+    );
+    if (unauthorizedClaims.length) {
+      throw new Error("You are not authorized to update some claims");
+    }
+
+    // Lọc những claim có trạng thái hợp lệ (Draft, Pending)
+    const validClaims = claims.filter(
+      (claim) =>
+        claim.status_id.name === "Draft" || claim.status_id.name === "Pending"
+    );
+
+    if (!validClaims.length) {
+      throw new Error(
+        "No valid claims to update (must be 'Draft' or 'Pending')"
+      );
+    }
+
+    // Nếu có trạng thái mới, kiểm tra hợp lệ
+    let newStatus;
+    if (status) {
+      newStatus = await StatusModel.findOne({ name: status });
+      if (!newStatus) {
+        throw new Error("Status not found");
+      } else if (status !== "Pending" && status !== "Cancelled") {
+        throw new Error("You are not allowed to update this status");
+      }
+    }
+
+    // Cập nhật tất cả claims hợp lệ
+    const updatedClaims = await Promise.all(
+      validClaims.map(async (claim) => {
+        const updateClaimData = {
+          status_id: newStatus?._id || claim.status_id,
+        };
+
+        return await ClaimModel.findByIdAndUpdate(claim._id, updateClaimData, {
+          new: true,
+        });
+      })
+    );
+
+    return {
+      status: "OK",
+      message: "Successfully updated claims",
+      data: updatedClaims,
+    };
+  } catch (error) {
+    return {
+      status: "ERR",
+      message: error.message,
+    };
+  }
+};
+
 const updateClaimForOtherRole = async (role, claimId, updateClaim) => {
   try {
     const claim = await ClaimModel.findById(claimId).populate("status_id");
@@ -372,6 +439,107 @@ const updateClaimForOtherRole = async (role, claimId, updateClaim) => {
         status: "OK",
         message: "Successfully updated claim",
         data: dataOutput,
+      };
+    }
+  } catch (error) {
+    return {
+      status: "ERR",
+      message: error.message,
+    };
+  }
+};
+
+const updateListClaimForOtherRole = async (role, claimIds, status, reason) => {
+  try {
+    // Lấy tất cả claim theo danh sách claimId
+    const claims = await ClaimModel.find({ _id: { $in: claimIds } }).populate(
+      "status_id"
+    );
+
+    if (!claims.length) {
+      throw new Error("No claims found");
+    }
+
+    // Lọc các claim hợp lệ (không phải Draft hoặc Cancelled)
+    const validClaims = claims.filter(
+      (claim) =>
+        claim.status_id.name !== "Cancelled" && claim.status_id.name !== "Draft"
+    );
+
+    if (!validClaims.length) {
+      throw new Error(
+        "No valid claims to update (must not be 'Draft' or 'Cancelled')"
+      );
+    }
+
+    let newStatus;
+    if (status) {
+      newStatus = await StatusModel.findOne({ name: status });
+      if (!newStatus) {
+        throw new Error("Status not found");
+      }
+
+      validClaims.forEach((claim) => {
+        if (
+          claim.status_id.name === "Pending" &&
+          status !== "Approved" &&
+          status !== "Rejected" &&
+          role === "Approver"
+        ) {
+          throw new Error(
+            "Approver can only update status to 'Approved' or 'Rejected'"
+          );
+        } else if (
+          claim.status_id.name === "Approved" &&
+          status !== "Paid" &&
+          role === "Finance"
+        ) {
+          throw new Error("Finance can only update status to 'Paid'");
+        }
+      });
+
+      let updatedClaims;
+      if (role === "Approver") {
+        updatedClaims = await Promise.all(
+          validClaims.map(async (claim) => {
+            const updateClaimData = {
+              status_id: newStatus?._id || claim.status_id,
+              reason_approver: reason || claim.reason_approver,
+            };
+
+            return await ClaimModel.findByIdAndUpdate(
+              claim._id,
+              updateClaimData,
+              {
+                new: true,
+              }
+            );
+          })
+        );
+      }
+
+      if (role === "Finance") {
+        updatedClaims = await Promise.all(
+          validClaims.map(async (claim) => {
+            const updateClaimData = {
+              status_id: newStatus?._id || claim.status_id,
+            };
+
+            return await ClaimModel.findByIdAndUpdate(
+              claim._id,
+              updateClaimData,
+              {
+                new: true,
+              }
+            );
+          })
+        );
+      }
+
+      return {
+        status: "OK",
+        message: "Successfully updated claims",
+        data: updatedClaims,
       };
     }
   } catch (error) {
@@ -498,4 +666,6 @@ module.exports = {
   getClaimById,
   getPaidClaimsForCurrentMonth,
   generatePaidClaimsExcel,
+  updateListClaimForClaimer,
+  updateListClaimForOtherRole,
 };

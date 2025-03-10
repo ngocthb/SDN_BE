@@ -391,7 +391,115 @@ routerClaim.get(
  *                   type: string
  *                   example: "Internal server error"
  */
-routerClaim.get("/", authUserMiddleware, claimController.getClaim); // claimer thì trả về của nó thôi còn mấy role khác thì trả về tất cả
+routerClaim.get("/", authUserMiddleware, claimController.getClaim);
+
+/**
+ * @swagger
+ * /claim/update-list:
+ *   put:
+ *     summary: Cập nhật danh sách yêu cầu bồi thường
+ *     description: Cho phép cập nhật trạng thái của nhiều yêu cầu bồi thường dựa trên vai trò của người dùng.
+ *     tags: [Claims]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               claimIds:
+ *                 type: array
+ *                 description: Danh sách ID của các yêu cầu bồi thường cần cập nhật.
+ *                 items:
+ *                   type: string
+ *                 example: ["67ce90eab4e3e62c02caf2ea", "67ce9115b4e3e62c02cafb93"]
+ *               status:
+ *                 type: string
+ *                 description: Trạng thái mới của yêu cầu bồi thường.
+ *                 example: "Pending"
+ *               reason:
+ *                 type: string
+ *                 description: Lý do cập nhật trạng thái (dành cho Approver).
+ *                 example: "Validated all documents"
+ *     responses:
+ *       200:
+ *         description: Trả về kết quả cập nhật danh sách yêu cầu bồi thường.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "OK"
+ *                 message:
+ *                   type: string
+ *                   example: "Successfully updated claims"
+ *                 data:
+ *                   type: array
+ *                   description: Danh sách yêu cầu bồi thường sau khi cập nhật.
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                         example: "67ce90eab4e3e62c02caf2ea"
+ *                       status:
+ *                         type: string
+ *                         example: "Pending"
+ *                       reason_approver:
+ *                         type: string
+ *                         example: "Validated all documents"
+ *                       updatedAt:
+ *                         type: string
+ *                         example: "2025-03-10T12:00:00Z"
+ *       403:
+ *         description: Không có quyền cập nhật yêu cầu bồi thường.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "ERR"
+ *                 message:
+ *                   type: string
+ *                   example: "Permission denied"
+ *       404:
+ *         description: Không tìm thấy yêu cầu bồi thường.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "ERR"
+ *                 message:
+ *                   type: string
+ *                   example: "No claims found"
+ *       500:
+ *         description: Lỗi server hoặc xử lý.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "ERR"
+ *                 message:
+ *                   type: string
+ *                   example: "Internal server error"
+ */
+routerClaim.put(
+  "/update-list",
+  authUserMiddleware,
+  claimController.updateListClaims
+);
 
 /**
  * @swagger
