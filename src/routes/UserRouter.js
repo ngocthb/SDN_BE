@@ -247,7 +247,7 @@ routerUser.put(
 
 /**
  * @swagger
- * /change-password:
+ * /user/change-password:
  *   put:
  *     summary: Change user password
  *     description: Allows authenticated users to change their password.
