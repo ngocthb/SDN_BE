@@ -251,8 +251,7 @@ routerUser.put(
  *   put:
  *     summary: Change user password
  *     description: Allows authenticated users to change their password.
- *     tags:
- *       - User
+ *     tags: [Users]
  *     security:
  *       - BearerAuth: []
  *     requestBody:
