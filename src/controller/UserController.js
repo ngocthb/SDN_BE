@@ -137,20 +137,36 @@ const getUserByToken = async (req, res) => {
   }
 };
 
-// const refreshToken = async (req, res) => {
-//   try {
-//     var token = req.headers?.authorization?.split(" ")[1];
-//     if (!token) {
-//       return res
-//         .status(200)
-//         .json({ status: "ERR", message: "Token is required" });
-//     }
-//     const response = await jwtService.RefreshTokenJWT(token);
-//     return res.status(200).json(response);
-//   } catch (error) {
-//     return res.status(404).json({ message: error.message });
-//   }
-// };
+const changePassword = async (req, res) => {
+  try {
+    const { old_password, new_password } = req.body;
+    const userID = req.user.id;
+    if (!old_password || !new_password) {
+      return res
+        .status(200)
+        .json({ status: "ERR", message: "All fields are required" });
+    }
+    const isStrictPassword = (password) => {
+      const regex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
+      return regex.test(password);
+    };
+    if (!isStrictPassword(new_password)) {
+      return res.status(200).json({
+        status: "ERR",
+        message:
+          "Password must contain at least 8 characters, including uppercase and number",
+      });
+    }
+    const response = await UserServices.changePassword(
+      userID,
+      old_password,
+      new_password
+    );
+    return res.status(200).json(response);
+  } catch (error) {
+    return res.status(404).json({ message: error.message });
+  }
+};
 
 module.exports = {
   createUser,
@@ -159,4 +175,5 @@ module.exports = {
   getAllUser,
   getUserById,
   getUserByToken,
+  changePassword,
 };

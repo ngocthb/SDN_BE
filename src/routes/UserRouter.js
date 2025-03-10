@@ -247,6 +247,76 @@ routerUser.put(
 
 /**
  * @swagger
+ * /change-password:
+ *   put:
+ *     summary: Change user password
+ *     description: Allows authenticated users to change their password.
+ *     tags:
+ *       - User
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               old_password:
+ *                 type: string
+ *                 example: "Zxcvbnm1"
+ *               new_password:
+ *                 type: string
+ *                 example: "Zxcvbnm123"
+ *     responses:
+ *       200:
+ *         description: Password changed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "OK"
+ *                 message:
+ *                   type: string
+ *                   example: "Change password success"
+ *       400:
+ *         description: Invalid request or incorrect password
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "ERR"
+ *                 message:
+ *                   type: string
+ *                   example: "Old password is incorrect"
+ *       401:
+ *         description: Unauthorized (missing or invalid token)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "ERR"
+ *                 message:
+ *                   type: string
+ *                   example: "Unauthorized access"
+ */
+routerUser.put(
+  "/change-password",
+  authUserMiddleware,
+  userController.changePassword
+);
+
+/**
+ * @swagger
  * /user:
  *   get:
  *     summary: Lấy thông tin người dùng từ token

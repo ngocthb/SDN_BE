@@ -350,10 +350,68 @@ const getUserById = (id) => {
   });
 };
 
+const changePassword = async (userID, old_password, new_password) => {
+  try {
+    const checkUser = await UserModel.findById(userID);
+    if (!checkUser) {
+      return { status: "ERR", message: "User does not exist" };
+    }
+    const checkPassword = bcrypt.compareSync(old_password, checkUser.password);
+    if (!checkPassword) {
+      return { status: "ERR", message: "Old password is incorrect" };
+    }
+    const isStrictPassword = (password) => {
+      const regex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
+      return regex.test(password);
+    };
+    if (!isStrictPassword(new_password)) {
+      return {
+        status: "ERR",
+        message:
+          "Password must contain at least 8 characters, including uppercase and number",
+      };
+    }
+    const hash = bcrypt.hashSync(new_password, 10);
+    const updateData = await UserModel.findByIdAndUpdate(
+      userID,
+      {
+        password: hash,
+      },
+      { new: true }
+    );
+    const dataUser = await UserModel.findById(updateData._id).populate(
+      "role_id",
+      "name -_id"
+    );
+    const dataOutput = {
+      _id: dataUser._id,
+      email: dataUser.email,
+      user_name: dataUser.user_name,
+      password: dataUser.password,
+      role_name: dataUser.role_id.name,
+      avatar: dataUser.avatar,
+      status: dataUser.status,
+      department: dataUser.department,
+      job_rank: dataUser.job_rank,
+      salary: dataUser.salary,
+      createdAt: dataUser.createdAt,
+      updatedAt: dataUser.updatedAt,
+    };
+    return {
+      status: "OK",
+      message: "Change password success",
+      data: dataOutput,
+    };
+  } catch (error) {
+    return { status: "ERR", message: error.message };
+  }
+};
+
 module.exports = {
   createUser,
   loginUser,
   updateUser,
   getAllUser,
   getUserById,
+  changePassword,
 };
