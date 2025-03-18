@@ -1,7 +1,7 @@
 const express = require("express");
 const CommentController = require("../controller/CommentController.js");
 const CommentRouter = express.Router();
-const { authUserMiddleware } = require("../middleware/AuthMiddleware.js");
+const { authUserMiddleware } = require("../middleware/authMiddleware.js");
 
 CommentRouter.post(
   "/create",
