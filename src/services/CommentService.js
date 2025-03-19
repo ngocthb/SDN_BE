@@ -106,8 +106,8 @@ const getComments = async (claim_id) => {
       });
 
       if (!comments || comments.length === 0) {
-        return reject({
-          status: "ERR",
+        return resolve({
+          status: "OK",
           message: "Comments not found",
         });
       }
@@ -218,6 +218,13 @@ const replyComment = async (
         select: "user_name email",
       });
 
+      if (userBeReply.user_id.email !== userCreate.email) {
+        return reject({
+          status: "ERR",
+          message: "You are not the owner of this comment",
+        });
+      }
+
       let replyDoc = await ReplyModel.findOne({ comment_id });
 
       if (!replyDoc) {
@@ -233,12 +240,11 @@ const replyComment = async (
 
       const result = await replyDoc.save();
 
-      if (userBeReply.user_id.email !== userCreate.email) {
-        await transporter.sendMail({
-          from: process.env.SMTP_USER,
-          to: userBeReply.user_id.email,
-          subject: "New Reply on Your Comment",
-          html: `
+      await transporter.sendMail({
+        from: process.env.SMTP_USER,
+        to: userBeReply.user_id.email,
+        subject: "New Reply on Your Comment",
+        html: `
           <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: auto; border: 1px solid #ddd; border-radius: 10px;">
             <h2 style="color: #007bff; text-align: center;">📢 New Reply on Your Comment</h2>
             <p style="font-size: 16px;">Hello,</p>
@@ -270,8 +276,7 @@ const replyComment = async (
             <p style="text-align: center; font-size: 12px; color: #666;">&copy; 2024 Your Company. All rights reserved.</p>
           </div>
         `,
-        });
-      }
+      });
 
       resolve({
         status: "OK",
