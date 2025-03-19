@@ -42,11 +42,12 @@ const createComment = async (user_id, claim_id, content, role) => {
       });
 
       const result = await commentDoc.save();
-      await transporter.sendMail({
-        from: process.env.SMTP_USER,
-        to: emailUserOwner,
-        subject: "New Comment on Your Claim",
-        html: `
+      if (emailUserOwner !== userCreate.email) {
+        await transporter.sendMail({
+          from: process.env.SMTP_USER,
+          to: emailUserOwner,
+          subject: "New Comment on Your Claim",
+          html: `
           <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: auto; border: 1px solid #ddd; border-radius: 10px;">
             <h2 style="color: #007bff; text-align: center;">📢 New Comment on Your Claim</h2>
             <p style="font-size: 16px;">Hello,</p>
@@ -78,7 +79,8 @@ const createComment = async (user_id, claim_id, content, role) => {
             <p style="text-align: center; font-size: 12px; color: #666;">&copy; 2024 Your Company. All rights reserved.</p>
           </div>
         `,
-      });
+        });
+      }
 
       resolve({
         status: "OK",

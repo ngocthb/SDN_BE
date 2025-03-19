@@ -23,10 +23,6 @@ const createComment = async (req, res) => {
     const role = await checkRole(userID);
     if (role.status === "ERR") {
       return res.status(200).json({ status: "ERR", message: role.message });
-    } else if (role.role === "Claimer") {
-      return res
-        .status(200)
-        .json({ status: "ERR", message: "You are not allowed to access" });
     }
     const { claim_id, content } = req.body;
     const response = await CommentService.createComment(
