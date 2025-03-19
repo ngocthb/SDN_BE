@@ -94,9 +94,7 @@ const createComment = async (user_id, claim_id, content, role) => {
 const getComments = async (claim_id) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const comments = await CommentModel.findOne({
-        claim_id: claim_id,
-      }).populate({
+      let comments = await CommentModel.find({ claim_id }).populate({
         path: "user_id",
         select: "user_name avatar role",
         populate: {
@@ -105,40 +103,69 @@ const getComments = async (claim_id) => {
         },
       });
 
-      const reply = await ReplyModel.findOne({
-        comment_id: comments?._id,
-      }).populate({
-        path: "reply",
-        populate: {
-          path: "user_id",
-          select: "user_name avatar role_id", // Phải là role_id nếu users có role_id
-          populate: {
-            path: "role_id", // Đúng đường dẫn tới bảng roles
-            select: "name",
-          },
-        },
-      });
+      if (!comments || comments.length === 0) {
+        return reject({
+          status: "ERR",
+          message: "Comments not found",
+        });
+      }
 
-      const formattedReplies = reply
-        ? reply.reply.map((r) => ({
-            _id: r._id,
-            claim_id: r.claim_id,
-            content: r.content,
-            createdAt: r.createdAt,
-            user: r.user_id
-              ? {
-                  _id: r.user_id._id,
-                  user_name: r.user_id.user_name,
-                  avatar: r.user_id.avatar,
-                  role: r.user_id.role_id ? r.user_id.role_id.name : null, // Phải là role_id.name
-                }
-              : null,
-          }))
-        : [];
+      const replies = await ReplyModel.find(
+        { comment_id: { $in: comments.map((c) => c._id) } },
+        "reply"
+      );
+
+      const repliedCommentIds = new Set(
+        replies.flatMap((r) => r.reply.map((id) => id.toString()))
+      );
+
+      const filteredComments = comments.filter(
+        (comment) => !repliedCommentIds.has(comment._id.toString())
+      );
+
+      const commentsWithReplies = await Promise.all(
+        filteredComments.map(async (comment) => {
+          const replies = await ReplyModel.find({
+            comment_id: comment._id,
+          }).populate({
+            path: "reply",
+            populate: {
+              path: "user_id",
+              select: "user_name avatar role_id",
+              populate: {
+                path: "role_id",
+                select: "name",
+              },
+            },
+          });
+
+          return {
+            ...comment.toObject(),
+            replies:
+              replies?.flatMap(
+                (reply) =>
+                  reply?.reply?.map((r) => ({
+                    _id: r._id,
+                    claim_id: r.claim_id,
+                    content: r.content,
+                    createdAt: r.createdAt,
+                    user: r.user_id
+                      ? {
+                          _id: r.user_id._id,
+                          user_name: r.user_id.user_name,
+                          avatar: r.user_id.avatar,
+                          role: r.user_id?.role_id?.name || null,
+                        }
+                      : null,
+                  })) || []
+              ) || [],
+          };
+        })
+      );
 
       resolve({
         status: "OK",
-        data: { ...comments._doc, reply: formattedReplies },
+        data: commentsWithReplies,
       });
     } catch (error) {
       reject(error);
