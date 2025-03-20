@@ -80,6 +80,7 @@ const getToken = async () => {
   if (cachedToken && Date.now() < tokenExpiration) {
     return cachedToken;
   }
+  console.log("Fetching new token..." + keyFile);
 
   const auth = new GoogleAuth({
     credentials: keyFile,

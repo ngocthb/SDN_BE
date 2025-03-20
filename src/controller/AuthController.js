@@ -36,7 +36,6 @@ const getToken = async (req, res) => {
     const token = await AuthService.getToken();
     res.json({ accessToken: token });
   } catch (error) {
-    console.error("❌ Lỗi lấy token:", error);
     res.status(500).json({ error: "Error token" });
   }
 };
