@@ -31,7 +31,19 @@ const resetPassword = async (req, res) => {
   }
 };
 
+const getToken = async (req, res) => {
+  try {
+    const token = await AuthService.getToken();
+    res.json({ accessToken: token });
+  } catch (error) {
+    console.error("❌ Lỗi lấy token:", error);
+    res.status(500).json({ error: "Error token" });
+  }
+};
+
 module.exports = {
   forgotPassword,
   resetPassword,
+
+  getToken,
 };

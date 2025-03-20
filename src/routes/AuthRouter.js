@@ -105,4 +105,6 @@ AuthRouter.post("/forgot-password", AuthController.forgotPassword);
  */
 AuthRouter.post("/reset-password", AuthController.resetPassword);
 
+AuthRouter.get("/get-token", AuthController.getToken);
+
 module.exports = AuthRouter;

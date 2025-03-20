@@ -1,6 +1,6 @@
 const UserModel = require("../models/UserModel");
 const nodemailer = require("nodemailer");
-
+const { GoogleAuth } = require("google-auth-library");
 const bcrypt = require("bcrypt");
 
 const dotenv = require("dotenv");
@@ -72,7 +72,31 @@ const resetPassword = async (email, otp, newPassword) => {
   return { status: "OK", message: "Reset password successfully!" };
 };
 
+let cachedToken = null;
+let tokenExpiration = 0;
+
+const keyFile = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+const getToken = async () => {
+  if (cachedToken && Date.now() < tokenExpiration) {
+    return cachedToken;
+  }
+
+  const auth = new GoogleAuth({
+    credentials: keyFile,
+    scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+  });
+
+  const client = await auth.getClient();
+  const token = await client.getAccessToken();
+
+  cachedToken = token.token;
+  tokenExpiration = Date.now() + 50 * 60 * 1000;
+
+  return cachedToken;
+};
+
 module.exports = {
   sendResetPasswordOTP,
   resetPassword,
+  getToken,
 };
