@@ -218,10 +218,10 @@ const replyComment = async (
         select: "user_name email",
       });
 
-      if (userBeReply.user_id.email !== userCreate.email) {
+      if (userBeReply.user_id.email === userCreate.email) {
         return reject({
           status: "ERR",
-          message: "You are not the owner of this comment",
+          message: "You can not reply yourself comment",
         });
       }
 
