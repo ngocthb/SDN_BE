@@ -79,8 +79,20 @@ const replyComment = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+const getAllComments = async (req, res) => {
+  try {
+    const userID = req.user.id;
+    const response = await CommentService.getAllComments(userID);
+    res.json(response);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createComment,
   getComments,
   replyComment,
+  getAllComments,
 };

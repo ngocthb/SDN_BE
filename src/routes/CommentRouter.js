@@ -8,7 +8,22 @@ CommentRouter.post(
   authUserMiddleware,
   CommentController.createComment
 );
-
+/**
+ * @swagger
+ * /comment:
+ *   get:
+ *     summary: Lấy danh sách tất cả bình luận
+ *     tags:
+ *       - Comments
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Thành công, trả về danh sách bình luận
+ *       401:
+ *         description: Không có quyền truy cập
+ */
+CommentRouter.get("/", authUserMiddleware, CommentController.getAllComments);
 CommentRouter.get("/:claim_id", CommentController.getComments);
 
 CommentRouter.post(
