@@ -23,10 +23,17 @@ const createComment = async (user_id, claim_id, content, role) => {
     try {
       const userCreate = await UserModel.findById(user_id);
 
-      const claim = await ClaimModel.findById(claim_id).populate(
-        "user_id",
-        "email"
-      );
+      const claim = await ClaimModel.findById(claim_id)
+        .populate("user_id", "email ")
+        .populate({
+          path: "user_id",
+          populate: {
+            path: "role_id",
+            select: "name",
+          },
+        })
+        .populate("status_id", "name");
+
       if (!claim) {
         return reject({
           status: "ERR",
@@ -42,6 +49,18 @@ const createComment = async (user_id, claim_id, content, role) => {
       });
 
       const result = await commentDoc.save();
+
+      let url = "";
+      if (claim.user_id.role_id.name === "Claimer") {
+        url = claim.status_id.name.toLowerCase();
+      } else if (role.role === "Approver") {
+        if (claim.status_id.name === "Pending") {
+          url = "vetting";
+        } else if (claim.status_id.name === "Approved") {
+          url = "history";
+        }
+      }
+
       if (emailUserOwner !== userCreate.email) {
         await transporter.sendMail({
           from: process.env.SMTP_USER,
@@ -71,7 +90,7 @@ const createComment = async (user_id, claim_id, content, role) => {
             </div>
       
             <p style="font-size: 16px; margin-top: 15px;">You can check the full details of your claim in your account.</p>
-            <a href="http://localhost:5173/claimer/pending/${claim_id}" style="display: block; text-align: center; padding: 10px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-size: 16px; margin-top: 10px;">
+            <a href="https://deploy-mock-claim-request.vercel.app/${claim.user_id.role_id.name.toLowerCase()}/${url}/${claim_id}" style="display: block; text-align: center; padding: 10px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-size: 16px; margin-top: 10px;">
               View Claim
             </a>
       
@@ -209,6 +228,17 @@ const replyComment = async (
     try {
       const userCreate = await UserModel.findById(user_id);
       const reply = await CommentModel.findById(reply_id);
+      const claim = await ClaimModel.findById(claim_id)
+        .populate("user_id", "email ")
+        .populate({
+          path: "user_id",
+          populate: {
+            path: "role_id",
+            select: "name",
+          },
+        })
+        .populate("status_id", "name");
+
       if (!reply) {
         return reject({ status: "ERR", message: "Reply comment not found" });
       }
@@ -235,6 +265,18 @@ const replyComment = async (
       } else {
         if (!replyDoc.reply.includes(reply_id)) {
           replyDoc.reply.push(reply_id);
+        }
+      }
+
+      let url = "";
+
+      if (claim.user_id.role_id.name === "Claimer") {
+        url = claim.status_id.name.toLowerCase();
+      } else if (role.role === "Approver") {
+        if (claim.status_id.name === "Pending") {
+          url = "vetting";
+        } else if (claim.status_id.name === "Approved") {
+          url = "history";
         }
       }
 
@@ -268,7 +310,7 @@ const replyComment = async (
             </div>
       
             <p style="font-size: 16px; margin-top: 15px;">You can check the full details of your claim in your account.</p>
-            <a href="http://localhost:5173/claimer/pending/${claim_id}" style="display: block; text-align: center; padding: 10px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-size: 16px; margin-top: 10px;">
+            <a href="https://deploy-mock-claim-request.vercel.app/${claim.user_id.role_id.name.toLowerCase()}/${url}/${claim_id}" style="display: block; text-align: center; padding: 10px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-size: 16px; margin-top: 10px;">
               View Claim
             </a>
       

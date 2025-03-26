@@ -8,6 +8,7 @@ CommentRouter.post(
   authUserMiddleware,
   CommentController.createComment
 );
+
 /**
  * @swagger
  * /comment:
@@ -24,6 +25,7 @@ CommentRouter.post(
  *         description: Không có quyền truy cập
  */
 CommentRouter.get("/", authUserMiddleware, CommentController.getAllComments);
+
 CommentRouter.get("/:claim_id", CommentController.getComments);
 
 CommentRouter.post(
