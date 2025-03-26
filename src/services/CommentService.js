@@ -59,7 +59,7 @@ const createComment = async (user_id, claim_id, content, role) => {
         } else if (claim.status_id.name === "Approved") {
           url = "history";
         }
-      } else if (role.role === "Finance") {
+      } else if (claim.user_id.role_id.name === "Finance") {
         url = claim.status_id.name.toLowerCase();
       }
 
@@ -277,7 +277,7 @@ const replyComment = async (
         } else if (claim.status_id.name === "Approved") {
           url = "history";
         }
-      } else if (role.role === "Finance") {
+      } else if (userBeReply.user_id.role_id.name === "Finance") {
         url = claim.status_id.name.toLowerCase();
       }
 
