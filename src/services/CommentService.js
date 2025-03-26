@@ -59,6 +59,8 @@ const createComment = async (user_id, claim_id, content, role) => {
         } else if (claim.status_id.name === "Approved") {
           url = "history";
         }
+      } else if (role.role === "Finance") {
+        url = claim.status_id.name.toLowerCase();
       }
 
       if (emailUserOwner !== userCreate.email) {
@@ -275,6 +277,8 @@ const replyComment = async (
         } else if (claim.status_id.name === "Approved") {
           url = "history";
         }
+      } else if (role.role === "Finance") {
+        url = claim.status_id.name.toLowerCase();
       }
 
       const result = await replyDoc.save();
