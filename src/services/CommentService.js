@@ -53,7 +53,7 @@ const createComment = async (user_id, claim_id, content, role) => {
       let url = "";
       if (claim.user_id.role_id.name === "Claimer") {
         url = claim.status_id.name.toLowerCase();
-      } else if (role.role === "Approver") {
+      } else if (claim.user_id.role_id.name === "Approver") {
         if (claim.status_id.name === "Pending") {
           url = "vetting";
         } else if (claim.status_id.name === "Approved") {
