@@ -335,10 +335,19 @@ const replyComment = async (
   });
 };
 
-const getAllComments = async (userId) => {
+const getCommentsByClaimId = async (claim_id) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const comments = await CommentModel.find({ user_id: userId });
+      const comments = await CommentModel.find({ claim_id: claim_id }).populate(
+        {
+          path: "user_id",
+          select: "user_name avatar role_id",
+          populate: {
+            path: "role_id",
+            select: "name",
+          },
+        }
+      );
       if (!comments || comments.length === 0) {
         return resolve({
           status: "OK",
@@ -346,67 +355,154 @@ const getAllComments = async (userId) => {
         });
       }
 
-      const replies = await ReplyModel.find(
-        { comment_id: { $in: comments.map((c) => c._id) } },
-        "reply"
-      );
+      const outputData = comments.map((comment) => {
+        return {
+          _id: comment._id,
+          claim_id: comment.claim_id,
+          content: comment.content,
+          createdAt: comment.createdAt,
+          status: comment.status,
+          type: "claims",
+          user: {
+            _id: comment.user_id._id,
+            user_name: comment.user_id.user_name,
+            avatar: comment.user_id.avatar,
+            role: comment.user_id?.role_id?.name || null,
+          },
+        };
+      });
+      resolve(outputData);
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
 
-      const repliedCommentIds = new Set(
-        replies.flatMap((r) => r.reply.map((id) => id.toString()))
-      );
+const getCommentsByUserId = async (user_id) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const comments = await CommentModel.find({ user_id: user_id }).populate({
+        path: "user_id",
+        select: "user_name avatar role_id",
+        populate: {
+          path: "role_id",
+          select: "name",
+        },
+      });
+      if (!comments || comments.length === 0) {
+        return resolve({
+          status: "OK",
+          message: "Comments not found",
+        });
+      }
 
-      const filteredComments = comments.filter(
-        (comment) => !repliedCommentIds.has(comment._id.toString())
-      );
+      const outputData = comments.map((comment) => {
+        return {
+          _id: comment._id,
+          claim_id: comment.claim_id,
+          content: comment.content,
+          createdAt: comment.createdAt,
+          status: comment.status,
+          type: "comments",
+          user: {
+            _id: comment.user_id._id,
+            user_name: comment.user_id.user_name,
+            avatar: comment.user_id.avatar,
+            role: comment.user_id?.role_id?.name || null,
+          },
+        };
+      });
+      resolve(outputData);
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
 
-      const commentsWithReplies = await Promise.all(
-        filteredComments.map(async (comment) => {
-          const replies = await ReplyModel.find({
-            comment_id: comment._id,
-          }).populate({
-            path: "reply",
+const getReplyCommentsByCommentId = async (comment_id) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      let replies = await ReplyModel.findOne({ comment_id: comment_id });
+      replies = replies?.reply || [];
+      if (!replies || replies.length === 0) {
+        return resolve([]);
+      }
+      let comments = await Promise.all(
+        replies.map(async (reply) => {
+          return await CommentModel.findById(reply).populate({
+            path: "user_id",
+            select: "user_name avatar role_id",
             populate: {
-              path: "user_id",
-              select: "user_name avatar role_id",
-              populate: {
-                path: "role_id",
-                select: "name",
-              },
+              path: "role_id",
+              select: "name",
             },
           });
-
-          const claim = await ClaimModel.findById(comment.claim_id).populate({
-            path: "status_id",
-            select: "name",
-          });
-
-          return {
-            ...comment.toObject(),
-            status_claim: claim.status_id.name,
-            replies:
-              replies?.flatMap(
-                (reply) =>
-                  reply?.reply?.map((r) => ({
-                    _id: r._id,
-                    claim_id: r.claim_id,
-
-                    content: r.content,
-                    createdAt: r.createdAt,
-                    user: r.user_id
-                      ? {
-                          _id: r.user_id._id,
-                          user_name: r.user_id.user_name,
-                          role: r.user_id?.role_id?.name || null,
-                        }
-                      : null,
-                  })) || []
-              ) || [],
-          };
         })
       );
+
+      const outputData = comments.map((comment) => {
+        return {
+          _id: comment._id,
+          claim_id: comment.claim_id,
+          content: comment.content,
+          createdAt: comment.createdAt,
+          status: comment.status,
+          type: "replies",
+          user: {
+            _id: comment.user_id._id,
+            user_name: comment.user_id.user_name,
+            avatar: comment.user_id.avatar,
+            role: comment.user_id?.role_id?.name || null,
+          },
+        };
+      });
+      resolve(outputData);
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
+const getAllComments = async (userId) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      let data = await getCommentsByUserId(userId);
+      const listIdClaim = await ClaimModel.find({
+        user_id: userId,
+      }).select("_id");
+
+      data = [
+        ...data,
+        await Promise.all(
+          listIdClaim.map(async (claim) => {
+            return await getCommentsByClaimId(claim._id);
+          })
+        ),
+      ];
+      const listIdComment = await CommentModel.find({
+        user_id: userId,
+      }).select("_id");
+      let dataListIdComment = await Promise.all(
+        listIdComment.map(async (comment) => {
+          return getReplyCommentsByCommentId(comment);
+        })
+      );
+
+      dataListIdComment = dataListIdComment.flat();
+      data = [...data, ...dataListIdComment];
+      data = data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      const totalComments = data.reduce((count, item) => {
+        return item.status === true ? count + 1 : count;
+      }, 0);
+
       resolve({
         status: "OK",
-        data: commentsWithReplies,
+        data: data,
+        total: {
+          totalCommentsDidNotRead: totalComments,
+          totalComments: data.length,
+        },
       });
     } catch (error) {
       reject(error);
