@@ -424,7 +424,7 @@ const getReplyCommentsByCommentId = async (comment_id) => {
     try {
       let replies = await ReplyModel.findOne({ comment_id: comment_id });
       replies = replies?.reply || [];
-      if (!replies || replies.length === 0) {
+      if (replies.length === 0) {
         return resolve([]);
       }
       let comments = await Promise.all(
@@ -490,6 +490,7 @@ const getAllComments = async (userId) => {
 
       dataListIdComment = dataListIdComment.flat();
       data = [...data, ...dataListIdComment];
+      data = data.filter((item) => item.length !== 0);
       data = data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
       const totalComments = data.reduce((count, item) => {
