@@ -493,7 +493,7 @@ const getAllComments = async (userId) => {
       data = data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
       const totalComments = data.reduce((count, item) => {
-        return item.status === true ? count + 1 : count;
+        return item.status === false ? count + 1 : count;
       }, 0);
 
       resolve({
