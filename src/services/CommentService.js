@@ -375,14 +375,21 @@ const getAllComments = async (userId) => {
             },
           });
 
+          const claim = await ClaimModel.findById(comment.claim_id).populate({
+            path: "status_id",
+            select: "name",
+          });
+
           return {
             ...comment.toObject(),
+            status_claim: claim.status_id.name,
             replies:
               replies?.flatMap(
                 (reply) =>
                   reply?.reply?.map((r) => ({
                     _id: r._id,
                     claim_id: r.claim_id,
+
                     content: r.content,
                     createdAt: r.createdAt,
                     user: r.user_id
@@ -407,10 +414,47 @@ const getAllComments = async (userId) => {
   });
 };
 
+const updateComment = async (comment_ids, status) => {
+  try {
+    const booleanStatus =
+      status === "true" ? true : status === "false" ? false : status;
+
+    const updatedComments = await Promise.all(
+      comment_ids.map(async (comment_id) => {
+        return await CommentModel.findByIdAndUpdate(
+          comment_id,
+          { $set: { status: booleanStatus } },
+          { new: true }
+        );
+      })
+    );
+
+    // Kiểm tra nếu không có comment nào được cập nhật
+    if (!updatedComments.some((comment) => comment !== null)) {
+      return {
+        status: "ERR",
+        message: "No comments found to update",
+      };
+    }
+
+    return {
+      status: "OK",
+      message: "Successfully updated comments",
+      data: updatedComments,
+    };
+  } catch (error) {
+    return {
+      status: "ERR",
+      message: error.message,
+    };
+  }
+};
+
 module.exports = {
   createComment,
   getComments,
   checkComment,
   replyComment,
   getAllComments,
+  updateComment,
 };
