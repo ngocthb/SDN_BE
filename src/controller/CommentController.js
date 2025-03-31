@@ -92,9 +92,13 @@ const getAllComments = async (req, res) => {
 
 const updateComment = async (req, res) => {
   try {
-    const { comment_ids, status } = req.body;
+    const { comment_ids, status, delete_status } = req.body;
 
-    const response = await CommentService.updateComment(comment_ids, status);
+    const response = await CommentService.updateComment(
+      comment_ids,
+      status,
+      delete_status
+    );
     res.json(response);
   } catch (error) {
     res.status(400).json({ message: error.message });

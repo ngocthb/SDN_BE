@@ -77,7 +77,10 @@ const loginUser = (userLogin) => {
     const { email, password } = userLogin;
 
     try {
-      const checkUser = await UserModel.findOne({ email: email });
+      const checkUser = await UserModel.findOne({
+        email: { $regex: new RegExp(`^${email}$`, "i") },
+      });
+
       if (!checkUser) {
         reject({
           status: "ERR",

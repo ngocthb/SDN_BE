@@ -18,6 +18,10 @@ const commentSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    delete_status: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

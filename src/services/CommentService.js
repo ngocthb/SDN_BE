@@ -362,6 +362,7 @@ const getCommentsByClaimId = async (claim_id) => {
           content: comment.content,
           createdAt: comment.createdAt,
           status: comment.status,
+          delete_status: comment.delete_status,
           type: "claims",
           user: {
             _id: comment.user_id._id,
@@ -403,6 +404,7 @@ const getCommentsByUserId = async (user_id) => {
           content: comment.content,
           createdAt: comment.createdAt,
           status: comment.status,
+          delete_status: comment.delete_status,
           type: "comments",
           user: {
             _id: comment.user_id._id,
@@ -447,6 +449,7 @@ const getReplyCommentsByCommentId = async (comment_id) => {
           content: comment.content,
           createdAt: comment.createdAt,
           status: comment.status,
+          delete_status: comment.delete_status,
           type: "replies",
           user: {
             _id: comment.user_id._id,
@@ -492,7 +495,7 @@ const getAllComments = async (userId) => {
       data = [...data, ...dataListIdComment];
       data = data.filter((item) => item.length !== 0);
       data = data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
+      data = data.filter((item) => item.delete_status !== true);
       const totalComments = data.reduce((count, item) => {
         return item.status === false ? count + 1 : count;
       }, 0);
@@ -511,16 +514,24 @@ const getAllComments = async (userId) => {
   });
 };
 
-const updateComment = async (comment_ids, status) => {
+const updateComment = async (comment_ids, status, delete_status) => {
   try {
     const booleanStatus =
       status === "true" ? true : status === "false" ? false : status;
-
+    const booleanDeleteStatus =
+      delete_status === "true"
+        ? true
+        : delete_status === "false"
+        ? false
+        : delete_status;
     const updatedComments = await Promise.all(
       comment_ids.map(async (comment_id) => {
         return await CommentModel.findByIdAndUpdate(
           comment_id,
-          { $set: { status: booleanStatus } },
+          {
+            $set: { status: booleanStatus, delete_status: booleanDeleteStatus },
+          },
+
           { new: true }
         );
       })
