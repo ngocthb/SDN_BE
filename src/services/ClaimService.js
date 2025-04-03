@@ -176,6 +176,9 @@ const getClaim = (role, userId, filters, page, limit, sortBy, sortOrder) => {
       if (limit && page) {
         listClaimsData = listClaimsData.slice((page - 1) * limit, page * limit);
       }
+      listClaimsData = listClaimsData.sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      );
 
       const dataOutput = {
         claims: listClaimsData,
