@@ -13,6 +13,9 @@ const options = {
       {
         url: "https://ojtbe-production.up.railway.app/api",
       },
+      {
+        url: "https://ojt-be.onrender.com/api",
+      },
     ],
     components: {
       securitySchemes: {
