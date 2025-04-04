@@ -270,7 +270,7 @@ const getAllUser = (page, limit) => {
   return new Promise(async (resolve, reject) => {
     try {
       const listUser = await UserModel.find().populate("role_id", "name -_id");
-      const listUserData = listUser.map((user) => {
+      let listUserData = listUser.map((user) => {
         return {
           _id: user._id,
           user_name: user.user_name,
@@ -285,6 +285,11 @@ const getAllUser = (page, limit) => {
           updatedAt: user.updatedAt,
         };
       });
+
+      listUserData.sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      );
+
       const dataOutput = {
         user: listUserData,
         total: {
