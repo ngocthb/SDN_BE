@@ -47,6 +47,8 @@ const getAllProject = async (page, limit, search) => {
       });
     }
 
+    projects.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
     return {
       status: "OK",
       message: "Successfully retrieved all projects",
