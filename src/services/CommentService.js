@@ -21,6 +21,9 @@ const transporter = nodemailer.createTransport({
 const createComment = async (user_id, claim_id, content, role) => {
   return new Promise(async (resolve, reject) => {
     try {
+      const vnTime = new Date().toLocaleString("vi-VN", {
+        timeZone: "Asia/Ho_Chi_Minh",
+      });
       const userCreate = await UserModel.findById(user_id);
 
       const claim = await ClaimModel.findById(claim_id)
@@ -72,7 +75,7 @@ const createComment = async (user_id, claim_id, content, role) => {
           <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: auto; border: 1px solid #ddd; border-radius: 10px;">
             <h2 style="color: #007bff; text-align: center;">📢 New Comment on Your Claim</h2>
             <p style="font-size: 16px;">Hello,</p>
-            <p style="font-size: 16px;">You have received a new comment on your claim at <strong>${new Date().toLocaleString()}</strong>:</p>
+            <p style="font-size: 16px;">You have received a new comment on your claim at <strong>${vnTime}</strong>:</p>
             
             <div style="display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; background-color: #f3f3f3;">
             
@@ -228,6 +231,9 @@ const replyComment = async (
 ) => {
   return new Promise(async (resolve, reject) => {
     try {
+      const vnTime = new Date().toLocaleString("vi-VN", {
+        timeZone: "Asia/Ho_Chi_Minh",
+      });
       const userCreate = await UserModel.findById(user_id);
       const reply = await CommentModel.findById(reply_id);
       const claim = await ClaimModel.findById(claim_id)
@@ -294,7 +300,7 @@ const replyComment = async (
           <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: auto; border: 1px solid #ddd; border-radius: 10px;">
             <h2 style="color: #007bff; text-align: center;">📢 New Reply on Your Comment</h2>
             <p style="font-size: 16px;">Hello,</p>
-            <p style="font-size: 16px;">You have received a new comment on your claim at <strong>${new Date().toLocaleString()}</strong>:</p>
+            <p style="font-size: 16px;">You have received a new comment on your claim at <strong>${vnTime}</strong>:</p>
             
             <div style="display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; background-color: #f3f3f3;">
             
