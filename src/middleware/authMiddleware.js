@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
 dotenv.config();
 
+// middleware dịch token sang id người dùng
 const authUserMiddleware = (req, res, next) => {
   try {
     const authHeader = req.headers?.authorization;
