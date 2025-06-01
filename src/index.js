@@ -16,7 +16,6 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 routes(app);
-swaggerDocs(app);
 
 mongoose
   .connect(process.env.MONGO_URL)
