@@ -2,7 +2,6 @@ const express = require("express");
 const dotenv = require("dotenv");
 const { default: mongoose } = require("mongoose");
 const routes = require("./routes");
-const swaggerDocs = require("./swagger");
 
 dotenv.config();
 const cors = require("cors");
