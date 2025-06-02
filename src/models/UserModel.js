@@ -3,10 +3,12 @@ const mongoose = require("mongoose");
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: false },
-    phone: { type: String, required: true },
     email: { type: String, required: false, unique: true },
-    password: { type: String, required: true },
-    token: { type: String, required: false },
+    passwordHash: { type: String, required: true },
+    dateOfBirth: { type: Date, required: false },
+    gender: { type: Boolean, required: false }, // true = nu, false = nam
+    isAdmin: { type: Boolean, default: false },
+    isCoach: { type: Boolean, default: false },
   },
   {
     timestamps: true,
