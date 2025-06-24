@@ -194,6 +194,54 @@ const getPlanHistory = async (req, res) => {
     }
 };
 
+// Lấy giai đoạn hiện tại
+const getCurrentStage = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const result = await QuitPlansService.getCurrentStage(userId);
+
+        if (!result.success) {
+            return res.status(404).json(result);
+        }
+
+        return res.status(200).json(result);
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+// Lấy thông tin chi tiết giai đoạn
+const getStageById = async (req, res) => {
+    try {
+        const { stageId } = req.params;
+        const userId = req.user.id;
+
+        if (!stageId) {
+            return res.status(400).json({
+                success: false,
+                message: "stageId là bắt buộc"
+            });
+        }
+
+        const result = await QuitPlansService.getStageById(userId, stageId);
+
+        if (!result.success) {
+            return res.status(404).json(result);
+        }
+
+        return res.status(200).json(result);
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
 module.exports = {
     getSuggestedPlan,
     createQuitPlan,
@@ -201,5 +249,7 @@ module.exports = {
     updateQuitPlan,
     completePlan,
     cancelPlan,
-    getPlanHistory
+    getPlanHistory,
+    getCurrentStage,
+    getStageById
 };

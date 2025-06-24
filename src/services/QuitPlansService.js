@@ -455,6 +455,260 @@ const getPlanHistory = async (userId) => {
     }
 };
 
+// Lấy giai đoạn hiện tại của kế hoạch
+const getCurrentStage = async (userId) => {
+    try {
+        // Lấy kế hoạch đang active
+        const currentPlan = await QuitPlansModel.findOne({
+            userId: userId,
+            isActive: true
+        }).populate("userId", "name email");
+
+        if (!currentPlan) {
+            return {
+                success: false,
+                message: "Không có kế hoạch cai thuốc nào đang thực hiện"
+            };
+        }
+
+        // Lấy tất cả stages của kế hoạch
+        const stages = await PlanStagesModel.find({
+            quitPlansId: currentPlan._id
+        }).sort({ orderNumber: 1 });
+
+        if (stages.length === 0) {
+            return {
+                success: false,
+                message: "Kế hoạch không có giai đoạn nào"
+            };
+        }
+
+        // Tính số ngày đã trải qua từ khi bắt đầu kế hoạch
+        const now = new Date();
+        const daysPassed = Math.floor((now - currentPlan.startDate) / (1000 * 60 * 60 * 24));
+        const totalDays = Math.floor((currentPlan.expectedQuitDate - currentPlan.startDate) / (1000 * 60 * 60 * 24));
+
+        // Tính tổng tiến độ toàn kế hoạch
+        const overallProgressPercentage = Math.min(Math.max(Math.round((daysPassed / totalDays) * 100), 0), 100);
+
+        // Tìm giai đoạn hiện tại
+        let currentStage = null;
+        let stageStartDay = 0;
+        let stageIndex = 0;
+
+        for (let i = 0; i < stages.length; i++) {
+            const stage = stages[i];
+            const stageEndDay = stageStartDay + stage.daysToComplete;
+
+            if (daysPassed >= stageStartDay && daysPassed < stageEndDay) {
+                // Đang trong giai đoạn này
+                const daysInCurrentStage = daysPassed - stageStartDay;
+                const remainingDaysInStage = stage.daysToComplete - daysInCurrentStage;
+
+                currentStage = {
+                    ...stage.toObject(),
+                    stageIndex: i + 1,
+                    totalStages: stages.length,
+                    stageStartDay: stageStartDay,
+                    stageEndDay: stageEndDay - 1,
+                    daysInCurrentStage: daysInCurrentStage,
+                    remainingDaysInStage: remainingDaysInStage,
+                    stageProgressPercentage: Math.round((daysInCurrentStage / stage.daysToComplete) * 100),
+                    isCompleted: false,
+                    status: "in_progress"
+                };
+                stageIndex = i;
+                break;
+            } else if (daysPassed >= stageEndDay && i === stages.length - 1) {
+                // Đã hoàn thành tất cả các giai đoạn
+                currentStage = {
+                    ...stage.toObject(),
+                    stageIndex: i + 1,
+                    totalStages: stages.length,
+                    stageStartDay: stageStartDay,
+                    stageEndDay: stageEndDay - 1,
+                    daysInCurrentStage: stage.daysToComplete,
+                    remainingDaysInStage: 0,
+                    stageProgressPercentage: 100,
+                    isCompleted: true,
+                    status: "completed_all"
+                };
+                stageIndex = i;
+                break;
+            }
+
+            stageStartDay = stageEndDay;
+        }
+
+        // Nếu chưa bắt đầu giai đoạn nào (daysPassed < 0)
+        if (!currentStage && daysPassed < 0) {
+            currentStage = {
+                ...stages[0].toObject(),
+                stageIndex: 1,
+                totalStages: stages.length,
+                stageStartDay: 0,
+                stageEndDay: stages[0].daysToComplete - 1,
+                daysInCurrentStage: 0,
+                remainingDaysInStage: stages[0].daysToComplete,
+                stageProgressPercentage: 0,
+                isCompleted: false,
+                status: "not_started"
+            };
+            stageIndex = 0;
+        }
+
+        // Tính tiến độ từng giai đoạn với thông tin chi tiết
+        const stagesWithProgress = stages.map((stage, index) => {
+            let stageStart = 0;
+            for (let j = 0; j < index; j++) {
+                stageStart += stages[j].daysToComplete;
+            }
+
+            const stageEnd = stageStart + stage.daysToComplete;
+            let stageStatus = "upcoming";
+            let stageDaysCompleted = 0;
+            let stageProgressPercent = 0;
+
+            if (daysPassed >= stageEnd) {
+                // Giai đoạn đã hoàn thành
+                stageStatus = "completed";
+                stageDaysCompleted = stage.daysToComplete;
+                stageProgressPercent = 100;
+            } else if (daysPassed >= stageStart) {
+                // Giai đoạn đang thực hiện
+                stageStatus = "in_progress";
+                stageDaysCompleted = daysPassed - stageStart;
+                stageProgressPercent = Math.round((stageDaysCompleted / stage.daysToComplete) * 100);
+            }
+
+            return {
+                ...stage.toObject(),
+                stageIndex: index + 1,
+                stageStartDay: stageStart,
+                stageEndDay: stageEnd - 1,
+                status: stageStatus,
+                daysCompleted: stageDaysCompleted,
+                remainingDays: stage.daysToComplete - stageDaysCompleted,
+                progressPercentage: stageProgressPercent
+            };
+        });
+
+        // Lấy thông tin các giai đoạn theo trạng thái
+        const previousStages = stagesWithProgress.filter(stage => stage.status === "completed");
+        const nextStages = stagesWithProgress.filter(stage => stage.status === "upcoming");
+
+        return {
+            success: true,
+            data: {
+                currentStage: currentStage,
+                previousStages: previousStages,
+                nextStages: nextStages,
+                allStagesWithProgress: stagesWithProgress, // Thêm thông tin tất cả stages
+                planInfo: {
+                    planId: currentPlan._id,
+                    reason: currentPlan.reason,
+                    startDate: currentPlan.startDate,
+                    expectedQuitDate: currentPlan.expectedQuitDate,
+                    daysPassed: daysPassed,
+                    totalDays: totalDays,
+                    remainingDays: Math.max(0, totalDays - daysPassed),
+                    overallProgressPercentage: overallProgressPercentage // Tiến độ toàn kế hoạch
+                }
+            },
+            message: currentStage ?
+                (currentStage.status === "completed_all" ?
+                    "Bạn đã hoàn thành tất cả các giai đoạn!" :
+                    `Hiện tại bạn đang ở giai đoạn ${currentStage.stageIndex}: ${currentStage.title}`) :
+                "Không xác định được giai đoạn hiện tại"
+        };
+
+    } catch (error) {
+        throw new Error(`Lỗi khi lấy giai đoạn hiện tại: ${error.message}`);
+    }
+};
+
+// Lấy thông tin chi tiết giai đoạn theo ID
+const getStageById = async (userId, stageId) => {
+    try {
+        // Kiểm tra xem stage có thuộc về kế hoạch của user không
+        const currentPlan = await QuitPlansModel.findOne({
+            userId: userId,
+            isActive: true
+        });
+
+        if (!currentPlan) {
+            return {
+                success: false,
+                message: "Không có kế hoạch cai thuốc nào đang thực hiện"
+            };
+        }
+
+        const stage = await PlanStagesModel.findOne({
+            _id: stageId,
+            quitPlansId: currentPlan._id
+        });
+
+        if (!stage) {
+            return {
+                success: false,
+                message: "Không tìm thấy giai đoạn này trong kế hoạch của bạn"
+            };
+        }
+
+        // Lấy tất cả stages để tính toán vị trí
+        const allStages = await PlanStagesModel.find({
+            quitPlansId: currentPlan._id
+        }).sort({ orderNumber: 1 });
+
+        // Tính ngày bắt đầu của giai đoạn này
+        let stageStartDay = 0;
+        for (let i = 0; i < stage.orderNumber - 1; i++) {
+            stageStartDay += allStages[i].daysToComplete;
+        }
+
+        const stageEndDay = stageStartDay + stage.daysToComplete - 1;
+        const daysPassed = Math.floor((new Date() - currentPlan.startDate) / (1000 * 60 * 60 * 24));
+
+        // Xác định trạng thái giai đoạn
+        let status = "upcoming";
+        let daysInStage = 0;
+        let remainingDaysInStage = stage.daysToComplete;
+        let progressPercentage = 0;
+
+        if (daysPassed >= stageStartDay) {
+            if (daysPassed <= stageEndDay) {
+                status = "in_progress";
+                daysInStage = daysPassed - stageStartDay;
+                remainingDaysInStage = stage.daysToComplete - daysInStage;
+                progressPercentage = Math.round((daysInStage / stage.daysToComplete) * 100);
+            } else {
+                status = "completed";
+                daysInStage = stage.daysToComplete;
+                remainingDaysInStage = 0;
+                progressPercentage = 100;
+            }
+        }
+
+        return {
+            success: true,
+            data: {
+                ...stage.toObject(),
+                stageStartDay: stageStartDay,
+                stageEndDay: stageEndDay,
+                daysInStage: daysInStage,
+                remainingDaysInStage: remainingDaysInStage,
+                progressPercentage: progressPercentage,
+                status: status,
+                totalStages: allStages.length
+            },
+            message: "Lấy thông tin giai đoạn thành công"
+        };
+
+    } catch (error) {
+        throw new Error(`Lỗi khi lấy thông tin giai đoạn: ${error.message}`);
+    }
+};
+
 module.exports = {
     createQuitPlan,
     getSuggestedPlan,
@@ -462,5 +716,7 @@ module.exports = {
     updateQuitPlan,
     completePlan,
     cancelPlan,
-    getPlanHistory
+    getPlanHistory,
+    getCurrentStage,
+    getStageById
 };

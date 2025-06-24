@@ -13,6 +13,10 @@ routerQuitPlans.post("/", QuitPlansController.createQuitPlan);
 
 routerQuitPlans.get("/current", QuitPlansController.getCurrentPlan);
 
+routerQuitPlans.get("/current-stage", QuitPlansController.getCurrentStage);
+
+routerQuitPlans.get("/stages/:stageId", QuitPlansController.getStageById);
+
 routerQuitPlans.put("/:planId", QuitPlansController.updateQuitPlan);
 
 routerQuitPlans.put("/:planId/complete", QuitPlansController.completePlan);
