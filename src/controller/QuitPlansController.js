@@ -4,9 +4,7 @@ const jwt = require("jsonwebtoken");
 // Lấy gợi ý kế hoạch dựa trên tình trạng hút thuốc
 const getSuggestedPlan = async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userId = decoded.id;
+        const userId = req.user.id;
 
         const result = await QuitPlansService.getSuggestedPlan(userId);
 
@@ -48,9 +46,7 @@ const createQuitPlan = async (req, res) => {
             }
         }
 
-        const token = req.headers.authorization?.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userId = decoded.id;
+        const userId = req.user.id;
 
         const result = await QuitPlansService.createQuitPlan(userId, reason, customStages);
 
@@ -70,9 +66,7 @@ const createQuitPlan = async (req, res) => {
 // Lấy kế hoạch hiện tại
 const getCurrentPlan = async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userId = decoded.id;
+        const userId = req.user.id;
 
         const result = await QuitPlansService.getCurrentPlan(userId);
         return res.status(200).json(result);
@@ -110,9 +104,7 @@ const updateQuitPlan = async (req, res) => {
             }
         }
 
-        const token = req.headers.authorization?.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userId = decoded.id;
+        const userId = req.user.id;
 
         const result = await QuitPlansService.updateQuitPlan(planId, userId, updates);
 
@@ -141,9 +133,7 @@ const completePlan = async (req, res) => {
             });
         }
 
-        const token = req.headers.authorization?.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userId = decoded.id;
+        const userId = req.user.id;
 
         const result = await QuitPlansService.completePlan(planId, userId);
 
@@ -172,9 +162,7 @@ const cancelPlan = async (req, res) => {
             });
         }
 
-        const token = req.headers.authorization?.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userId = decoded.id;
+        const userId = req.user.id;
 
         const result = await QuitPlansService.cancelPlan(planId, userId);
 
@@ -194,9 +182,7 @@ const cancelPlan = async (req, res) => {
 // Lấy lịch sử kế hoạch
 const getPlanHistory = async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userId = decoded.id;
+        const userId = req.user.id;
 
         const result = await QuitPlansService.getPlanHistory(userId);
         return res.status(200).json(result);

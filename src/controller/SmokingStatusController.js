@@ -1,5 +1,4 @@
 const SmokingStatusService = require("../services/SmokingStatusService");
-const jwt = require("jsonwebtoken");
 
 // Tạo hoặc cập nhật tình trạng hút thuốc
 const createOrUpdateSmokingStatus = async (req, res) => {

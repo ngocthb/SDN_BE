@@ -1,9 +1,11 @@
 const express = require("express");
 const routerQuitPlans = express.Router();
 const QuitPlansController = require("../controller/QuitPlansController");
-const { authenticateToken } = require("../middleware/authMiddleware");
+const {
+    authUserMiddleware,
+} = require("../middleware/authMiddleware");
 
-routerQuitPlans.use(authenticateToken);
+routerQuitPlans.use(authUserMiddleware);
 
 routerQuitPlans.get("/suggestions", QuitPlansController.getSuggestedPlan);
 

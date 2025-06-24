@@ -4,6 +4,7 @@ const AuthRouter = require("./AuthRouter");
 const SubscriptionRouter = require("./SubscriptionRouter");
 const SmokingSatusRouter = require("./SmokingStatusRouter");
 const QuitPlansRouter = require("./QuitPlansRouter");
+const ProgressLogsRouter = require("./ProgressLogsRouter");
 
 const routes = (app) => {
   app.use("/api/user", UserRouter);
@@ -11,6 +12,7 @@ const routes = (app) => {
   app.use("/api/subscription", SubscriptionRouter);
   app.use("/api/smoking-status", SmokingSatusRouter);
   app.use("/api/quit-plans", QuitPlansRouter);
+  app.use("/api/progress-logs", ProgressLogsRouter);
 }
 
 module.exports = routes;
