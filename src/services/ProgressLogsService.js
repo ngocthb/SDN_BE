@@ -15,6 +15,19 @@ const logDailyProgress = async (userId, cigarettesPerDay, healthNote = "", mood 
             };
         }
 
+        // Kiểm tra xem có kế hoạch cai thuốc đang active không
+        const activePlan = await QuitPlansModel.findOne({
+            userId: userId,
+            isActive: true
+        });
+
+        if (!activePlan) {
+            return {
+                success: false,
+                message: "Bạn cần có kế hoạch cai thuốc đang thực hiện để ghi nhận tiến trình. Vui lòng tạo kế hoạch cai thuốc trước."
+            };
+        }
+
         // Validation
         if (cigarettesPerDay < 0) {
             return {
