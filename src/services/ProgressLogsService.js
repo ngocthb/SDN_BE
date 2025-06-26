@@ -210,16 +210,16 @@ const getProgressStatistics = async (userId) => {
         return {
             success: true,
             data: {
-                totalDaysLogged: allLogs.length,
-                daysWithoutSmoking: daysWithoutSmoking,
-                longestStreakWithoutSmoking: longestStreak,
-                averageCigarettesPerDay: Math.round(averageCigarettesPerDay * 100) / 100,
-                weeklyAverage: Math.round(weeklyAverage * 100) / 100,
-                totalMoneySaved: Math.round(totalMoneySaved),
-                progressPercentage: progressPercentage,
-                healthImprovements: healthImprovements,
-                moodTrends: moodCounts,
-                recentLogs: allLogs.slice(-7),
+                totalDaysLogged: allLogs.length, // Tổng số ngày đã ghi nhận
+                daysWithoutSmoking: daysWithoutSmoking, // Số ngày không hút thuốc
+                longestStreakWithoutSmoking: longestStreak, // Streak dài nhất không hút thuốc
+                averageCigarettesPerDay: Math.round(averageCigarettesPerDay * 100) / 100, // Trung bình điếu thuốc/ngày
+                current7DaysAverage: Math.round(weeklyAverage * 100) / 100, // Trung bình điếu thuốc trong 7 ngày gần nhất
+                totalMoneySaved: Math.round(totalMoneySaved), // Tổng tiền tiết kiệm được
+                progressPercentage: progressPercentage, // % tiến trình dựa trên kế hoạch
+                healthImprovements: healthImprovements, // Dự đoán cải thiện sức khỏe
+                moodTrends: moodCounts, // Xu hướng tâm trạng
+                recentLogs: allLogs.slice(-7), // 7 log gần nhất
                 planInfo: currentPlan ? {
                     startDate: currentPlan.startDate,
                     expectedQuitDate: currentPlan.expectedQuitDate,

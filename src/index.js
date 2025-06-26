@@ -2,6 +2,7 @@ const express = require("express");
 const dotenv = require("dotenv");
 const { default: mongoose } = require("mongoose");
 const routes = require("./routes");
+const { startDailyReminderCron, startDailySummaryCron, startTestReminderCron, startAutoCompleteCron } = require("./services/CronService");
 
 dotenv.config();
 const cors = require("cors");
@@ -13,6 +14,11 @@ const port = process.env.PORT;
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
+
+startDailyReminderCron();    // Gửi email lúc 17:00
+// startTestReminderCron();
+startDailySummaryCron();     // Báo cáo lúc 17:30
+startAutoCompleteCron(); // Tự động hoàn thành kế hoạch hết hạn lúc 8:00 sáng
 
 routes(app);
 
