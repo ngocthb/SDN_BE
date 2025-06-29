@@ -42,7 +42,8 @@ const createUser = async (name, email, password) => {
 const loginUser = async (email, password) => {
   try {
     const user = await UserModel.findOne({ email: email });
-    if (user.length === 0) {
+
+    if (!user) {
       throw new Error("User not found with this email. Please register first.");
     }
 
