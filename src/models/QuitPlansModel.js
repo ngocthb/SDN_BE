@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const quitPlansSchema = new mongoose.Schema(
   {
-    _id: false, // Bo id mac dinh o bang nay
+    // _id: false, // Bo id mac dinh o bang nay
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "users",
