@@ -40,9 +40,7 @@ const loginUser = async (req, res) => {
     }
     const response = await UserServices.loginUser(email, password);
     if (!response) {
-      return res
-        .status(201)
-        .json({ status: "ERR", message: "Invalid phone or password" });
+      return res.status(201).json({ status: "ERR", message: error.message });
     }
     return res.status(200).json({ status: "OK", data: response });
   } catch (error) {
