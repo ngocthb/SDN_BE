@@ -2,6 +2,7 @@ const QuitPlansModel = require("../models/QuitPlansModel");
 const PlanStagesModel = require("../models/PlanStagesModel");
 const SmokingStatusModel = require("../models/SmokingStatusModel");
 const UserModel = require("../models/UserModel");
+const nodemailer = require("nodemailer");
 
 // Template kế hoạch cai thuốc mặc định
 const getDefaultPlanTemplate = (cigarettesPerDay) => {
@@ -292,11 +293,11 @@ const getCurrentPlan = async (userId) => {
                 plan: currentPlan,
                 stages: stages,
                 progress: {
-                    daysPassed: daysPassed,
-                    totalDays: totalDays,
-                    remainingDays: totalDays - daysPassed,
-                    progressPercentage: progressPercentage,
-                    currentStage: currentStage
+                    daysPassed: daysPassed, // Số ngày đã qua kể từ khi bắt đầu kế hoạch
+                    totalDays: totalDays, // Tổng số ngày của kế hoạch
+                    remainingDays: totalDays - daysPassed, // Số ngày còn lại
+                    progressPercentage: progressPercentage, // Tiến độ tổng thể của kế hoạch
+                    currentStage: currentStage // Giai đoạn hiện tại (nếu có)
                 }
             },
             message: "Lấy kế hoạch hiện tại thành công"
@@ -391,6 +392,231 @@ const completePlan = async (planId, userId) => {
 
     } catch (error) {
         throw new Error(`Lỗi khi hoàn thành kế hoạch: ${error.message}`);
+    }
+};
+
+//Tự động hoàn thành các kế hoạch hết hạn
+const autoCompleteExpiredPlans = async () => {
+    try {
+        const now = new Date();
+
+        // Tìm tất cả kế hoạch đã hết hạn nhưng vẫn đang active
+        const expiredPlans = await QuitPlansModel.find({
+            isActive: true,
+            expectedQuitDate: { $lt: now }
+        }).populate("userId", "name email");
+
+        if (expiredPlans.length === 0) {
+            console.log("✅ Không có kế hoạch nào hết hạn cần tự động hoàn thành");
+            return {
+                success: true,
+                data: {
+                    autoCompletedCount: 0,
+                    emailsSent: 0
+                },
+                message: "Không có kế hoạch nào hết hạn cần tự động hoàn thành"
+            };
+        }
+
+        console.log(`🔍 Tìm thấy ${expiredPlans.length} kế hoạch hết hạn cần tự động hoàn thành`);
+
+        let autoCompletedCount = 0;
+        let emailsSent = 0;
+        const results = [];
+
+        for (const plan of expiredPlans) {
+            try {
+                const user = plan.userId;
+
+                // Tính toán thông tin
+                const daysPassed = Math.floor((now - plan.startDate) / (1000 * 60 * 60 * 24));
+                const totalDays = Math.floor((plan.expectedQuitDate - plan.startDate) / (1000 * 60 * 60 * 24));
+                const daysOverdue = Math.floor((now - plan.expectedQuitDate) / (1000 * 60 * 60 * 24));
+
+                // Tự động hoàn thành kế hoạch
+                plan.isActive = false;
+                plan.completedAt = now;
+                plan.completionStatus = "auto_completed"; // Đánh dấu là tự động hoàn thành
+                await plan.save();
+
+                autoCompletedCount++;
+
+                // Gửi email thông báo hoàn thành
+                if (user && user.email) {
+                    const emailSent = await sendCompletionEmail(user, plan, {
+                        daysPassed: daysPassed,
+                        totalDays: totalDays,
+                        daysOverdue: daysOverdue,
+                        isAutoCompleted: true
+                    });
+
+                    if (emailSent) {
+                        emailsSent++;
+                    }
+                }
+
+                results.push({
+                    userId: user._id,
+                    userName: user.name,
+                    userEmail: user.email,
+                    planId: plan._id,
+                    reason: plan.reason,
+                    daysPassed: daysPassed,
+                    daysOverdue: daysOverdue,
+                    completedAt: now
+                });
+
+                console.log(`✅ Tự động hoàn thành kế hoạch cho user ${user.name} (quá hạn ${daysOverdue} ngày)`);
+
+            } catch (error) {
+                console.error(`❌ Lỗi tự động hoàn thành kế hoạch cho user ${plan.userId.name}:`, error.message);
+            }
+        }
+
+        const result = {
+            success: true,
+            data: {
+                autoCompletedCount: autoCompletedCount,
+                emailsSent: emailsSent,
+                totalExpiredPlans: expiredPlans.length,
+                completedPlans: results,
+                executionTime: now.toLocaleString('vi-VN')
+            },
+            message: `Đã tự động hoàn thành ${autoCompletedCount}/${expiredPlans.length} kế hoạch hết hạn và gửi ${emailsSent} email thông báo`
+        };
+
+        console.log(`📊 Kết quả tự động hoàn thành: ${JSON.stringify(result.data)}`);
+        return result;
+
+    } catch (error) {
+        console.error("❌ Lỗi khi tự động hoàn thành kế hoạch hết hạn:", error.message);
+        throw new Error(`Lỗi khi tự động hoàn thành kế hoạch hết hạn: ${error.message}`);
+    }
+};
+
+// THÊM MỚI: Gửi email thông báo hoàn thành kế hoạch
+const sendCompletionEmail = async (user, plan, completionInfo) => {
+    try {
+        const transporter = nodemailer.createTransporter({
+            host: process.env.SMTP_HOST,
+            port: process.env.SMTP_PORT,
+            secure: false,
+            auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS,
+            },
+        });
+
+        const { daysPassed, totalDays, daysOverdue, isAutoCompleted } = completionInfo;
+        const progressPercentage = Math.min(Math.round((daysPassed / totalDays) * 100), 100);
+
+        let congratsMessage = "";
+        let statusMessage = "";
+
+        if (isAutoCompleted) {
+            congratsMessage = "🎉 Kế hoạch cai thuốc của bạn đã hoàn thành!";
+            statusMessage = `Kế hoạch đã được tự động hoàn thành sau ${daysPassed} ngày (quá hạn ${daysOverdue} ngày so với dự kiến).`;
+        } else {
+            congratsMessage = "🎉 Chúc mừng! Bạn đã hoàn thành kế hoạch cai thuốc!";
+            statusMessage = `Bạn đã hoàn thành kế hoạch sau ${daysPassed} ngày.`;
+        }
+
+        const emailHTML = `
+        <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 10px; background-color: #f9f9f9;">
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h2 style="color: #28a745; margin: 0;">${congratsMessage}</h2>
+                <p style="color: #6c757d; font-size: 14px;">Chào ${user.name}, chúc mừng bạn đã hoàn thành hành trình cai thuốc!</p>
+            </div>
+
+            <div style="background-color: white; padding: 25px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                <div style="font-size: 48px; margin-bottom: 10px;">🏆</div>
+                <h3 style="color: #28a745; margin: 10px 0;">HOÀN THÀNH!</h3>
+                <p style="font-size: 16px; color: #495057; margin: 0;">${statusMessage}</p>
+            </div>
+
+            <div style="background-color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h3 style="color: #007bff; margin-top: 0;">📋 Thông tin kế hoạch</h3>
+                <p style="margin: 8px 0;"><strong>Lý do cai thuốc:</strong> ${plan.reason}</p>
+                <p style="margin: 8px 0;"><strong>Ngày bắt đầu:</strong> ${plan.startDate.toLocaleDateString('vi-VN')}</p>
+                <p style="margin: 8px 0;"><strong>Ngày dự kiến:</strong> ${plan.expectedQuitDate.toLocaleDateString('vi-VN')}</p>
+                <p style="margin: 8px 0;"><strong>Ngày hoàn thành:</strong> ${new Date().toLocaleDateString('vi-VN')}</p>
+            </div>
+
+            <div style="background-color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h3 style="color: #28a745; margin-top: 0;">📊 Thống kê hành trình</h3>
+                <div style="display: flex; justify-content: space-around; margin-bottom: 15px;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 28px; font-weight: bold; color: #007bff;">${daysPassed}</div>
+                        <div style="font-size: 12px; color: #6c757d;">Ngày đã trải qua</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 28px; font-weight: bold; color: #28a745;">${progressPercentage}%</div>
+                        <div style="font-size: 12px; color: #6c757d;">Tiến độ hoàn thành</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 28px; font-weight: bold; color: #ffc107;">${totalDays}</div>
+                        <div style="font-size: 12px; color: #6c757d;">Ngày dự kiến</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background-color: #d4edda; border: 1px solid #c3e6cb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="color: #155724; margin-top: 0;">🌟 Chúc mừng thành tích của bạn!</h4>
+                <p style="color: #155724; margin-bottom: 15px;">Bạn đã vượt qua được một trong những thách thức lớn nhất - cai thuốc lá. Đây là một bước quan trọng cho sức khỏe và tương lai của bạn.</p>
+                
+                <h5 style="color: #155724; margin: 15px 0 10px 0;">💪 Để duy trì thành quả:</h5>
+                <ul style="color: #155724; margin: 0; padding-left: 20px;">
+                    <li>Tiếp tục tránh xa thuốc lá và môi trường có khói thuốc</li>
+                    <li>Duy trì lối sống lành mạnh với chế độ ăn uống cân bằng</li>
+                    <li>Tập thể dục thường xuyên để giảm stress</li>
+                    <li>Tự thưởng cho bản thân những thành tựu đã đạt được</li>
+                </ul>
+            </div>
+
+            ${isAutoCompleted ? `
+            <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="color: #856404; margin-top: 0;">📅 Tạo kế hoạch mới</h4>
+                <p style="color: #856404; margin: 0;">Nếu bạn muốn tiếp tục với mục tiêu cai thuốc hoàn toàn hoặc thiết lập thói quen mới, hãy tạo kế hoạch mới ngay hôm nay!</p>
+            </div>
+            ` : ''}
+
+            <div style="text-align: center; margin: 25px 0;">
+                <a href="${process.env.CLIENT_URL || 'http://localhost:3000'}/quit-plans" 
+                   style="background-color: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block; margin-right: 10px;">
+                    🎯 Tạo kế hoạch mới
+                </a>
+                <a href="${process.env.CLIENT_URL || 'http://localhost:3000'}/progress-logs" 
+                   style="background-color: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block;">
+                    📊 Xem thống kê
+                </a>
+            </div>
+
+            <hr style="border: 0.5px solid #ddd; margin: 20px 0;">
+            
+            <div style="text-align: center;">
+                <p style="font-size: 12px; color: #6c757d; margin: 5px 0;">
+                    Cảm ơn bạn đã tin tưởng và sử dụng ứng dụng cai thuốc của chúng tôi!
+                </p>
+                <p style="font-size: 12px; color: #6c757d; margin: 0;">
+                    &copy; 2025 Ứng dụng cai thuốc. Chúc bạn luôn khỏe mạnh!
+                </p>
+            </div>
+        </div>
+        `;
+
+        await transporter.sendMail({
+            from: process.env.SMTP_USER,
+            to: user.email,
+            subject: `🎉 ${isAutoCompleted ? 'Kế hoạch cai thuốc đã hoàn thành!' : 'Chúc mừng hoàn thành kế hoạch cai thuốc!'} - ${daysPassed} ngày thành công`,
+            html: emailHTML,
+        });
+
+        console.log(`✅ Đã gửi email hoàn thành cho ${user.name} (${user.email})`);
+        return true;
+
+    } catch (error) {
+        console.error(`❌ Lỗi gửi email hoàn thành cho ${user.email}:`, error.message);
+        return false;
     }
 };
 
@@ -583,13 +809,13 @@ const getCurrentStage = async (userId) => {
 
             return {
                 ...stage.toObject(),
-                stageIndex: index + 1,
-                stageStartDay: stageStart,
-                stageEndDay: stageEnd - 1,
-                status: stageStatus,
-                daysCompleted: stageDaysCompleted,
-                remainingDays: stage.daysToComplete - stageDaysCompleted,
-                progressPercentage: stageProgressPercent
+                stageIndex: index + 1, // Chỉ số giai đoạn (bắt đầu từ 1)
+                stageStartDay: stageStart, // Ngày bắt đầu giai đoạn
+                stageEndDay: stageEnd - 1, // Ngày kết thúc giai đoạn (inclusive)
+                status: stageStatus, // Trạng thái giai đoạn
+                daysCompleted: stageDaysCompleted, // Số ngày đã hoàn thành trong giai đoạn
+                remainingDays: stage.daysToComplete - stageDaysCompleted, // Số ngày còn lại trong giai đoạn
+                progressPercentage: stageProgressPercent // Tiến độ giai đoạn (0-100%)
             };
         });
 
@@ -600,18 +826,18 @@ const getCurrentStage = async (userId) => {
         return {
             success: true,
             data: {
-                currentStage: currentStage,
-                previousStages: previousStages,
-                nextStages: nextStages,
+                currentStage: currentStage, // Giai đoạn hiện tại
+                previousStages: previousStages,//Giai đoạn đã hoàn thành
+                nextStages: nextStages, //Giai đoạn sắp tới
                 allStagesWithProgress: stagesWithProgress, // Thêm thông tin tất cả stages
                 planInfo: {
-                    planId: currentPlan._id,
-                    reason: currentPlan.reason,
-                    startDate: currentPlan.startDate,
-                    expectedQuitDate: currentPlan.expectedQuitDate,
-                    daysPassed: daysPassed,
-                    totalDays: totalDays,
-                    remainingDays: Math.max(0, totalDays - daysPassed),
+                    planId: currentPlan._id, // ID của kế hoạch
+                    reason: currentPlan.reason,// Lý do cai thuốc
+                    startDate: currentPlan.startDate, // Ngày bắt đầu kế hoạch
+                    expectedQuitDate: currentPlan.expectedQuitDate,// Ngày dự kiến hoàn thành
+                    daysPassed: daysPassed, // Số ngày đã qua kể từ khi bắt đầu kế hoạch
+                    totalDays: totalDays, // Tổng số ngày của kế hoạch
+                    remainingDays: Math.max(0, totalDays - daysPassed), // Số ngày còn lại
                     overallProgressPercentage: overallProgressPercentage // Tiến độ toàn kế hoạch
                 }
             },
@@ -718,5 +944,7 @@ module.exports = {
     cancelPlan,
     getPlanHistory,
     getCurrentStage,
-    getStageById
+    getStageById,
+    autoCompleteExpiredPlans,
+    sendCompletionEmail
 };
