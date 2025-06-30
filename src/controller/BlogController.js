@@ -1,36 +1,27 @@
 const BlogService = require("../services/BlogService");
 
 exports.createBlog = async (req, res) => {
-    try {
-        const {title, content, authorId, imageUrl} = req.body;
-        if(!title.trim() || !content.trim() || !authorId.trim()) {
-            return res.status(400).json({
-                status: "Err",
-                message: "All fields are required except image URL"
-            })
-        }
+  try {
+    const { title, content, authorId, imageUrl } = req.body;
 
-        const dataRequest = {
-            title,
-            content,
-            authorId,
-            imageUrl
-        }
-
-        const newBlog = await BlogService.createBlog(dataRequest);
-
-        if(!newBlog) {
-            return res.status(400).json({
-                status: "Err",
-                message: "Cannot create new blog, try again!"
-            })
-        }
-
-        return res.status(201).json({
-            status: "OK",
-            data: newBlog
-        })
-    } catch (error) {
-        return res.status(404).json({message: error.message});
+    if (!title || !title.trim() || !content || !content.trim() || !authorId || !authorId.trim()) {
+      return res.status(400).json({
+        status: "Err",
+        message: "All fields are required except image URL",
+      });
     }
-}
+
+    const newBlog = await BlogService.createBlog({ title, content, authorId, imageUrl });
+
+    return res.status(201).json({
+      status: "OK",
+      data: newBlog,
+    });
+  } catch (error) {
+    console.error("Error creating blog:", error.message);
+    return res.status(400).json({
+      status: "Err",
+      message: error.message,
+    });
+  }
+};

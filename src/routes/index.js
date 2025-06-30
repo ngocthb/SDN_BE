@@ -21,6 +21,6 @@ const routes = (app) => {
   app.use("/api/chat", ChatRouter);
   app.use("/api/blog", BlogRouter);
   app.use("/api/comment", CommentRouter);
-}
+};
 
 module.exports = routes;

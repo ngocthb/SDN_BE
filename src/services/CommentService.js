@@ -1,32 +1,41 @@
 const CommentModel = require("../models/CommentsModel");
 const UserModel = require("../models/UserModel");
 const BlogModel = require("../models/BlogsModel");
+const mongoose = require("mongoose");
 
-exports.createComment = async (newComment) => {
-  const { content, authorId, blogId } = newComment;
+exports.validateComment = async (data) => {
+  const { content, authorId, blogId } = data;
 
-  if (!content || !authorId || !blogId) {
-    throw new Error("Missing required fields: content, authorId, or blogId.");
+  if (!content || !content.trim()) {
+    throw new Error("Content is required.");
   }
-
-  if (content.length < 1 || content.length > 500) {
+  if (content.trim().length < 1 || content.trim().length > 500) {
     throw new Error("Content must be between 1 and 500 characters.");
   }
 
-  const checkUser = await UserModel.findById(authorId);
-  if (!checkUser) {
-    throw new Error("Author not found.");
+  if (!authorId || !mongoose.Types.ObjectId.isValid(authorId)) {
+    throw new Error("Invalid authorId.");
+  }
+  const authorExists = await UserModel.findById(authorId);
+  if (!authorExists) {
+    throw new Error("Author does not exist.");
   }
 
-  const checkBlog = await BlogModel.findById(blogId);
-  if (!checkBlog) {
-    throw new Error("Blog not found.");
+  if (!blogId || !mongoose.Types.ObjectId.isValid(blogId)) {
+    throw new Error("Invalid blogId.");
   }
+  const blogExists = await BlogModel.findById(blogId);
+  if (!blogExists) {
+    throw new Error("Blog does not exist.");
+  }
+};
 
-  try {
-    const result = await CommentModel.create(newComment);
-    return result;
-  } catch (error) {
-    throw error;
-  }
+exports.createComment = async (data) => {
+  const newComment = await CommentModel.create({
+    content: data.content.trim(),
+    authorId: data.authorId,
+    blogId: data.blogId,
+  });
+
+  return newComment;
 };
