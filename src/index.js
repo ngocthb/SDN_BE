@@ -1,6 +1,7 @@
 const express = require("express");
 const dotenv = require("dotenv");
-const mongoose = require("mongoose");
+const { default: mongoose } = require("mongoose");
+dotenv.config();
 const cors = require("cors");
 const bodyParser = require("body-parser");
 
@@ -25,7 +26,9 @@ app.use(bodyParser.json());
 startDailyReminderCron();    // Gửi email lúc 17:00
 // startTestReminderCron();
 startDailySummaryCron();     // Báo cáo lúc 17:30
+
 startAutoCompleteCron(); // Tự động hoàn thành kế hoạch hết hạn lúc 8:00 sáng
+
 
 routes(app);
 

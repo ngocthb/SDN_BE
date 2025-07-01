@@ -1,6 +1,7 @@
 const cron = require("node-cron");
 const ReminderService = require("../services/ReminderService");
 const QuitPlansService = require("../services/QuitPlansService");
+
 // Chạy hàng ngày lúc 17:00 (5h chiều) cho tất cả users chưa ghi nhận
 const startDailyReminderCron = () => {
     // Cron pattern: "0 0 17 * * *" = 17:00 hàng ngày

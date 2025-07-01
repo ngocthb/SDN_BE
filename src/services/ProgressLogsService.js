@@ -2,6 +2,7 @@ const ProgressLogsModel = require("../models/ProgressLogsModel");
 const QuitPlansModel = require("../models/QuitPlansModel");
 const SmokingStatusModel = require("../models/SmokingStatusModel");
 const UserModel = require("../models/UserModel");
+const achievementService = require("../services/AchievementService")
 
 // Ghi nhận tiến trình hàng ngày
 const logDailyProgress = async (userId, cigarettesPerDay, healthNote = "", mood = "") => {
@@ -57,9 +58,12 @@ const logDailyProgress = async (userId, cigarettesPerDay, healthNote = "", mood 
             existingLog.mood = mood;
             await existingLog.save();
 
+            const newAchievements = await achievementService.evaluateAndGrantAchievements(userId);
+
             return {
                 success: true,
                 data: existingLog,
+                newAchievements,
                 message: "Cập nhật tiến trình hôm nay thành công"
             };
         } else {
@@ -76,9 +80,12 @@ const logDailyProgress = async (userId, cigarettesPerDay, healthNote = "", mood 
             const populatedLog = await ProgressLogsModel.findById(savedLog._id)
                 .populate("userId", "name email");
 
+            const newAchievements = await achievementService.evaluateAndGrantAchievements(userId);
+
             return {
                 success: true,
                 data: populatedLog,
+                newAchievements,
                 message: "Ghi nhận tiến trình thành công"
             };
         }

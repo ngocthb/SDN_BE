@@ -56,6 +56,7 @@ const authCoachMiddleware = (req, res, next) => {
   }
 };
 
+
 module.exports = {
   authUserMiddleware,
   authAdminMiddleware,

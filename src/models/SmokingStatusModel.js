@@ -3,7 +3,6 @@ const mongoose = require("mongoose");
 // ghi nhan tinh trang thai hut thuoc cua nguoi dung hien tai
 const smokingStatusSchema = new mongoose.Schema(
   {
-    // _id: false, // Bo id mac dinh o bang nay
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "users",

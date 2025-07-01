@@ -7,9 +7,9 @@ const likesSchema = new mongoose.Schema(
       ref: "users",
       required: true,
     }, // Người dùng đã thích
-    communityPostId: {
+    blogId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "communityPosts",
+      ref: "blogs",
       required: true,
     },
     isLiked: {
