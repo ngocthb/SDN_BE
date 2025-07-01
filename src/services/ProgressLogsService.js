@@ -140,6 +140,7 @@ const getProgressStatistics = async (userId) => {
                     longestStreakWithoutSmoking: 0,
                     averageCigarettesPerDay: 0,
                     totalMoneySaved: 0,
+                    totalSavedCigarettes: 0,
                     progressPercentage: 0,
                     healthImprovements: [],
                     moodTrends: {}
@@ -170,12 +171,14 @@ const getProgressStatistics = async (userId) => {
 
         // Tính tiền tiết kiệm được
         let totalMoneySaved = 0;
+        let totalSavedCigarettes = 0; // THÊM MỚI
         if (smokingStatus) {
             const originalCigarettesPerDay = smokingStatus.cigarettesPerDay;
             const pricePerCigarette = smokingStatus.pricePerCigarette;
 
             allLogs.forEach(log => {
                 const savedCigarettes = Math.max(0, originalCigarettesPerDay - log.cigarettesPerDay);
+                totalSavedCigarettes += savedCigarettes; // THÊM MỚI: Tính tổng số điếu đã bỏ được
                 totalMoneySaved += savedCigarettes * pricePerCigarette;
             });
         }
@@ -216,6 +219,7 @@ const getProgressStatistics = async (userId) => {
                 averageCigarettesPerDay: Math.round(averageCigarettesPerDay * 100) / 100, // Trung bình điếu thuốc/ngày
                 current7DaysAverage: Math.round(weeklyAverage * 100) / 100, // Trung bình điếu thuốc trong 7 ngày gần nhất
                 totalMoneySaved: Math.round(totalMoneySaved), // Tổng tiền tiết kiệm được
+                totalSavedCigarettes: Math.round(totalSavedCigarettes),
                 progressPercentage: progressPercentage, // % tiến trình dựa trên kế hoạch
                 healthImprovements: healthImprovements, // Dự đoán cải thiện sức khỏe
                 moodTrends: moodCounts, // Xu hướng tâm trạng
