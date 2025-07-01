@@ -8,7 +8,9 @@ const QuitPlansRouter = require("./QuitPlansRouter");
 const ProgressLogsRouter = require("./ProgressLogsRouter");
 
 const BlogRouter = require("./BlogRouter");
-const CommentRouter = require("./CommentRouter")
+const CommentRouter = require("./CommentRouter");
+const MembershipRouter = require("./MembershipRouter");
+const PayMembershipRouter = require("./PayMembershipRouter")
 
 const routes = (app) => {
   app.use("/api/user", UserRouter);
@@ -21,6 +23,8 @@ const routes = (app) => {
   app.use("/api/chat", ChatRouter);
   app.use("/api/blog", BlogRouter);
   app.use("/api/comment", CommentRouter);
+  app.use("/api/membership", MembershipRouter);
+  app.use("/api/payMembership", PayMembershipRouter);
 };
 
 module.exports = routes;

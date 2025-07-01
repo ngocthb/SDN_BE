@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 
 const membershipSchema = new mongoose.Schema(
   {
-    _id: false, //bo id mac dinh o bang nay
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "users",

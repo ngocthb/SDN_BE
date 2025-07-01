@@ -56,20 +56,9 @@ const authCoachMiddleware = (req, res, next) => {
   }
 };
 
-const authCoachOrAdminMiddleware = (req, res, next) => {
-  if (req.user.isCoach || req.user.isAdmin) {
-    next();
-  } else {
-    return res.status(403).json({
-      status: "ERR",
-      message: "You do not have permission to access this resource",
-    });
-  }
-};
 
 module.exports = {
   authUserMiddleware,
   authAdminMiddleware,
   authCoachMiddleware,
-  authCoachOrAdminMiddleware
 };
