@@ -17,6 +17,12 @@ const userSchema = new mongoose.Schema(
     verifyOTP: { type: String },
     verifyOTPExpires: { type: Date },
     status: { type: Boolean, default: false },
+    grantedAchievements: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "achievements",
+      },
+    ],
   },
   {
     timestamps: true,
