@@ -6,17 +6,17 @@ const messagesSchema = new mongoose.Schema(
     message: {
       type: String,
       required: true,
-    }, // Nội dung tin nhắn
+    },
     senderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "users",
       required: true,
-    }, // Người gửi tin nhắn
-    receiverId: {
+    },
+    chatId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "users",
+      ref: "chat",
       required: true,
-    }, // Người nhận tin nhắn
+    },
   },
   {
     timestamps: true,
