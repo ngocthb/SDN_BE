@@ -9,7 +9,6 @@ const ProgressLogsRouter = require("./ProgressLogsRouter");
 
 const BlogRouter = require("./BlogRouter");
 const CommentRouter = require("./CommentRouter");
-const MembershipRouter = require("./MembershipRouter");
 const PayMembershipRouter = require("./PayMembershipRouter");
 const AchievementRouter = require("./AchievementRouter");
 
@@ -24,7 +23,6 @@ const routes = (app) => {
   app.use("/api/chat", ChatRouter);
   app.use("/api/blog", BlogRouter);
   app.use("/api/comment", CommentRouter);
-  app.use("/api/membership", MembershipRouter);
   app.use("/api/payMembership", PayMembershipRouter);
   app.use("/api/achievement", AchievementRouter);
 };
