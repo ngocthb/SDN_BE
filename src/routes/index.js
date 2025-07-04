@@ -28,7 +28,6 @@ const routes = (app) => {
   app.use("/api/admin/ratings", adminRatingRoutes);
   app.use("/api/admin/feedback", adminFeedbackRoutes);
   app.use("/api/admin/users", adminUserRoutes);
-};
 
   app.use("/api/subscription", SubscriptionRouter);
   app.use("/api/smoking-status", SmokingSatusRouter);
