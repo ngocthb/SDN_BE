@@ -13,6 +13,11 @@ const SmokingSatusRouter = require("./SmokingStatusRouter");
 const QuitPlansRouter = require("./QuitPlansRouter");
 const ProgressLogsRouter = require("./ProgressLogsRouter");
 
+const BlogRouter = require("./BlogRouter");
+const CommentRouter = require("./CommentRouter");
+const PayMembershipRouter = require("./PayMembershipRouter");
+const AchievementRouter = require("./AchievementRouter");
+
 const routes = (app) => {
   app.use("/api/user", UserRouter);
   app.use("/api/auth", AuthRouter);
@@ -31,6 +36,10 @@ const routes = (app) => {
   app.use("/api/progress-logs", ProgressLogsRouter);
   app.use("/api/coach", CoachRouter);
   app.use("/api/chat", ChatRouter);
-}
+  app.use("/api/blog", BlogRouter);
+  app.use("/api/comment", CommentRouter);
+  app.use("/api/payMembership", PayMembershipRouter);
+  app.use("/api/achievement", AchievementRouter);
+};
 
 module.exports = routes;

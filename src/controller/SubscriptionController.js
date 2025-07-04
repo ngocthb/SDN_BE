@@ -1,151 +1,187 @@
-const SubscriptionsService = require("../services/SubscriptionsService");
+const subscriptionService = require("../services/SubscriptionService");
 
-// // Lấy tất cả gói membership
-// const getAllMemberships = async (req, res) => {
-//     try {
-//         const result = await SubscriptionsService.getAllMemberships();
-//         return res.status(200).json(result);
-//     } catch (error) {
-//         return res.status(500).json({
-//             success: false,
-//             message: error.message
-//         });
-//     }
-// };
+exports.createSubscription = async (req, res) => {
+  try {
+    const data = req.body;
 
-// // Lấy chi tiết một gói membership
-// const getMembershipById = async (req, res) => {
-//     try {
-//         const { membershipId } = req.params;
-//         const result = await SubscriptionsService.getMembershipById(membershipId);
+    await subscriptionService.validateSubscription(data);
 
-//         if (!result.success) {
-//             return res.status(404).json(result);
-//         }
+    const newSubscription = await subscriptionService.createSubscription(data);
 
-//         return res.status(200).json(result);
-//     } catch (error) {
-//         return res.status(500).json({
-//             success: false,
-//             message: error.message
-//         });
-//     }
-// };
-
-// Lấy subscription hiện tại của user
-const getCurrentSubscription = async (req, res) => {
-    try {
-        const userId = req.user.id;
-
-        const result = await SubscriptionsService.getCurrentSubscription(userId);
-        return res.status(200).json(result);
-    } catch (error) {
-        return res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
+    return res.status(201).json({
+      success: true,
+      message: "Subscription created successfully.",
+      data: newSubscription,
+    });
+  } catch (error) {
+    console.error("Error creating subscription:", error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Internal server error",
+    });
+  }
 };
 
-// Đăng ký gói mới
-const createSubscription = async (req, res) => {
-    try {
-        const { membershipId, paymentId } = req.body;
-
-        if (!membershipId || !paymentId) {
-            return res.status(400).json({
-                success: false,
-                message: "membershipId và paymentId là bắt buộc"
-            });
-        }
-
-        const userId = req.user.id;
-
-        const result = await SubscriptionsService.createSubscription(userId, membershipId, paymentId);
-
-        if (!result.success) {
-            return res.status(400).json(result);
-        }
-
-        return res.status(201).json(result);
-    } catch (error) {
-        return res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
+exports.getAllSubscriptions = async (req, res) => {
+  try {
+    const subscriptions = await subscriptionService.getAllSubscriptions();
+    return res.status(200).json({
+      success: true,
+      data: subscriptions,
+    });
+  } catch (error) {
+    console.error("Error fetching subscriptions:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
 };
 
-// Hủy subscription
-const cancelSubscription = async (req, res) => {
-    try {
-        const userId = req.user.id;
+exports.getSubscriptionById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const subscription = await subscriptionService.getSubscriptionById(id);
 
-        const result = await SubscriptionsService.cancelSubscription(userId);
-
-        if (!result.success) {
-            return res.status(404).json(result);
-        }
-
-        return res.status(200).json(result);
-    } catch (error) {
-        return res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
+    return res.status(200).json({
+      success: true,
+      data: subscription,
+    });
+  } catch (error) {
+    console.error("Error fetching subscription:", error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Internal server error",
+    });
+  }
 };
 
-// Lấy lịch sử subscription
-const getSubscriptionHistory = async (req, res) => {
-    try {
-        const userId = req.user.id;
+exports.updateSubscription = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = req.body;
 
-        const result = await SubscriptionsService.getSubscriptionHistory(userId);
-        return res.status(200).json(result);
-    } catch (error) {
-        return res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
+    const updated = await subscriptionService.updateSubscription(id, data);
+
+    return res.status(200).json({
+      success: true,
+      message: "Subscription updated successfully.",
+      data: updated,
+    });
+  } catch (error) {
+    console.error("Error updating subscription:", error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Internal server error",
+    });
+  }
 };
 
-// Gia hạn subscription
-const extendSubscription = async (req, res) => {
-    try {
-        const { membershipId, paymentId } = req.body;
+exports.deleteSubscription = async (req, res) => {
+  try {
+    const { id } = req.params;
 
-        if (!membershipId || !paymentId) {
-            return res.status(400).json({
-                success: false,
-                message: "membershipId và paymentId là bắt buộc"
-            });
-        }
+    await subscriptionService.deleteSubscription(id);
 
-        const userId = req.user.id;
-
-        const result = await SubscriptionsService.extendSubscription(userId, membershipId, paymentId);
-
-        if (!result.success) {
-            return res.status(400).json(result);
-        }
-
-        return res.status(200).json(result);
-    } catch (error) {
-        return res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
+    return res.status(200).json({
+      success: true,
+      message: "Subscription deleted successfully.",
+    });
+  } catch (error) {
+    console.error("Error deleting subscription:", error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Internal server error",
+    });
+  }
 };
 
-module.exports = {
-    // getAllMemberships,
-    // getMembershipById,
-    getCurrentSubscription,
-    createSubscription,
-    cancelSubscription,
-    getSubscriptionHistory,
-    extendSubscription
+exports.extendSubscription = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newEndDate } = req.body;
+
+    const updated = await subscriptionService.extendSubscription(
+      id,
+      newEndDate
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Subscription extended successfully.",
+      data: updated,
+    });
+  } catch (error) {
+    console.error("Error extending subscription:", error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Internal server error",
+    });
+  }
+};
+
+exports.cancelSubscription = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const updated = await subscriptionService.cancelSubscription(id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Subscription cancelled successfully.",
+      data: updated,
+    });
+  } catch (error) {
+    console.error("Error cancelling subscription:", error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Internal server error",
+    });
+  }
+};
+
+exports.getMySubscription = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const result = await subscriptionService.getMySubscription(userId);
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: result.message
+    });
+  } catch (error) {
+    console.error("Error fetching my subscription:", error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Internal server error",
+    });
+  }
+};
+
+exports.getMySubscriptionHistory = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 10 } = req.query;
+
+    const result = await subscriptionService.getMySubscriptionHistory(
+      userId,
+      parseInt(page),
+      parseInt(limit)
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: result.subscriptions,
+      pagination: result.pagination,
+      message: "Lấy lịch sử subscription thành công"
+    });
+  } catch (error) {
+    console.error("Error fetching my subscription history:", error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Internal server error",
+    });
+  }
 };
