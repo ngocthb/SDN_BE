@@ -139,3 +139,49 @@ exports.cancelSubscription = async (req, res) => {
     });
   }
 };
+
+exports.getMySubscription = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const result = await subscriptionService.getMySubscription(userId);
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: result.message
+    });
+  } catch (error) {
+    console.error("Error fetching my subscription:", error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Internal server error",
+    });
+  }
+};
+
+exports.getMySubscriptionHistory = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 10 } = req.query;
+
+    const result = await subscriptionService.getMySubscriptionHistory(
+      userId,
+      parseInt(page),
+      parseInt(limit)
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: result.subscriptions,
+      pagination: result.pagination,
+      message: "Lấy lịch sử subscription thành công"
+    });
+  } catch (error) {
+    console.error("Error fetching my subscription history:", error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Internal server error",
+    });
+  }
+};

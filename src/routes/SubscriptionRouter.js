@@ -25,4 +25,14 @@ routerSubscription.put(
   subscriptionController.cancelSubscription
 );
 
+routerSubscription.get(
+  "/my-subscription",
+  subscriptionController.getMySubscription
+);
+
+routerSubscription.get(
+  "/my-subscription/history",
+  subscriptionController.getMySubscriptionHistory
+);
+
 module.exports = routerSubscription;

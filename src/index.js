@@ -7,7 +7,7 @@ const bodyParser = require("body-parser");
 
 const routes = require("./routes");
 
-const { startDailyReminderCron, startDailySummaryCron, startTestReminderCron, startAutoCompleteCron } = require("./services/CronService");
+const { startDailyReminderCron, startDailySummaryCron, startTestReminderCron, startAutoCompleteCron, startSubscriptionExpirationCron } = require("./services/CronService");
 
 const setupSocket = require("./config/socket");
 
@@ -28,6 +28,8 @@ startDailyReminderCron();    // Gửi email lúc 17:00
 startDailySummaryCron();     // Báo cáo lúc 17:30
 
 startAutoCompleteCron(); // Tự động hoàn thành kế hoạch hết hạn lúc 8:00 sáng
+
+startSubscriptionExpirationCron(); // Kiểm tra subscription sắp hết hạn và gửi email cảnh báo lúc 9:00 sáng
 
 
 routes(app);

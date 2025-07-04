@@ -1,7 +1,7 @@
 const cron = require("node-cron");
 const ReminderService = require("../services/ReminderService");
 const QuitPlansService = require("../services/QuitPlansService");
-
+const SubscriptionReminderService = require("../services/SubscriptionReminderService");
 // Chạy hàng ngày lúc 17:00 (5h chiều) cho tất cả users chưa ghi nhận
 const startDailyReminderCron = () => {
     // Cron pattern: "0 0 17 * * *" = 17:00 hàng ngày
@@ -81,9 +81,35 @@ const startAutoCompleteCron = () => {
     console.log("✅ Đã khởi tạo cron job tự động hoàn thành kế hoạch hết hạn lúc 8:00 sáng");
 };
 
+// THÊM MỚI: Cron job kiểm tra subscription sắp hết hạn
+const startSubscriptionExpirationCron = () => {
+    // Chạy hàng ngày lúc 9:00 sáng để kiểm tra subscription sắp hết hạn
+    cron.schedule("0 0 9 * * *", async () => {
+        console.log("📧 Bắt đầu kiểm tra subscription sắp hết hạn và gửi email cảnh báo...");
+
+        try {
+            const result = await SubscriptionReminderService.checkAndSendExpirationWarnings();
+
+            if (result.success) {
+                console.log(`✅ Hoàn thành kiểm tra subscription: ${result.data.subscriptionsChecked} subscription được kiểm tra, ${result.data.emailsSent} email cảnh báo đã gửi, ${result.data.emailsFailed} email thất bại`);
+            } else {
+                console.error(`❌ Lỗi kiểm tra subscription: ${result.message}`);
+            }
+        } catch (error) {
+            console.error("❌ Lỗi cron job kiểm tra subscription:", error.message);
+        }
+    }, {
+        scheduled: true,
+        timezone: "Asia/Ho_Chi_Minh"
+    });
+
+    console.log("✅ Đã khởi tạo cron job kiểm tra subscription sắp hết hạn lúc 9:00 sáng");
+};
+
 module.exports = {
     startDailyReminderCron,
     startTestReminderCron,
     startDailySummaryCron,
-    startAutoCompleteCron
+    startAutoCompleteCron,
+    startSubscriptionExpirationCron
 };
