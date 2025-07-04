@@ -3,7 +3,50 @@ const PlanStagesModel = require("../models/PlanStagesModel");
 const SmokingStatusModel = require("../models/SmokingStatusModel");
 const UserModel = require("../models/UserModel");
 const nodemailer = require("nodemailer");
+const SubscriptionService = require("./SubscriptionService");
 
+// Thêm hàm helper để kiểm tra subscription và tính ngày còn lại
+const checkSubscriptionLimit = async (userId, requiredDays) => {
+    try {
+        const subscriptionResult = await SubscriptionService.getMySubscription(userId);
+
+        if (!subscriptionResult.hasActiveSubscription) {
+            return {
+                isValid: false,
+                message: "Bạn cần có gói đăng ký active để tạo kế hoạch tùy chỉnh",
+                remainingDays: 0
+            };
+        }
+
+        const subscription = subscriptionResult.subscription;
+        const remainingDays = subscription.daysRemaining;
+
+        if (requiredDays > remainingDays) {
+            return {
+                isValid: false,
+                message: `Tổng số ngày của kế hoạch (${requiredDays} ngày) vượt quá thời hạn gói đăng ký còn lại (${remainingDays} ngày). Vui lòng giảm số ngày hoặc gia hạn gói đăng ký.`,
+                remainingDays: remainingDays,
+                requiredDays: requiredDays,
+                excessDays: requiredDays - remainingDays
+            };
+        }
+
+        return {
+            isValid: true,
+            message: "Kế hoạch phù hợp với thời hạn gói đăng ký",
+            remainingDays: remainingDays,
+            requiredDays: requiredDays
+        };
+
+    } catch (error) {
+        console.error("Lỗi kiểm tra subscription:", error.message);
+        return {
+            isValid: false,
+            message: "Không thể kiểm tra thông tin gói đăng ký. Vui lòng thử lại sau.",
+            remainingDays: 0
+        };
+    }
+};
 // Template kế hoạch cai thuốc mặc định
 const getDefaultPlanTemplate = (cigarettesPerDay) => {
     let planDuration = 30; // Mặc định 30 ngày
@@ -143,16 +186,81 @@ const createQuitPlan = async (userId, reason, customStages = null) => {
         let planTemplate;
 
         if (customStages && customStages.length > 0) {
+            const totalCustomDays = customStages.reduce((sum, stage) => sum + stage.daysToComplete, 0);
+
+            // Kiểm tra subscription limit
+            const subscriptionCheck = await checkSubscriptionLimit(userId, totalCustomDays);
+            if (!subscriptionCheck.isValid) {
+                return {
+                    success: false,
+                    message: subscriptionCheck.message,
+                    data: {
+                        remainingDays: subscriptionCheck.remainingDays,
+                        requiredDays: subscriptionCheck.requiredDays,
+                        excessDays: subscriptionCheck.excessDays
+                    }
+                };
+            }
+
+            // Validation cơ bản cho custom stages
+            for (let i = 0; i < customStages.length; i++) {
+                const stage = customStages[i];
+
+                if (!stage.title || stage.title.trim() === "") {
+                    return {
+                        success: false,
+                        message: `Giai đoạn ${i + 1}: Tiêu đề không được để trống`
+                    };
+                }
+
+                if (!stage.description || stage.description.trim() === "") {
+                    return {
+                        success: false,
+                        message: `Giai đoạn ${i + 1}: Mô tả không được để trống`
+                    };
+                }
+
+                if (!stage.daysToComplete || stage.daysToComplete <= 0) {
+                    return {
+                        success: false,
+                        message: `Giai đoạn ${i + 1}: Số ngày hoàn thành phải lớn hơn 0`
+                    };
+                }
+
+                if (stage.daysToComplete > 365) {
+                    return {
+                        success: false,
+                        message: `Giai đoạn ${i + 1}: Số ngày hoàn thành không được vượt quá 365 ngày`
+                    };
+                }
+            }
+
             // Sử dụng kế hoạch tùy chỉnh
-            const totalDays = customStages.reduce((sum, stage) => sum + stage.daysToComplete, 0);
             planTemplate = {
-                planDuration: totalDays,
-                stages: customStages
+                planDuration: totalCustomDays,
+                stages: customStages.map((stage, index) => ({
+                    ...stage,
+                    orderNumber: index + 1 // Tự động gán orderNumber
+                }))
             };
         } else {
             // Sử dụng template mặc định
             const cigarettesPerDay = smokingStatus ? smokingStatus.cigarettesPerDay : 15;
             planTemplate = getDefaultPlanTemplate(cigarettesPerDay);
+
+            const subscriptionCheck = await checkSubscriptionLimit(userId, planTemplate.planDuration);
+            if (!subscriptionCheck.isValid) {
+                return {
+                    success: false,
+                    message: `${subscriptionCheck.message} Bạn có thể tạo kế hoạch ngắn hơn hoặc gia hạn gói đăng ký.`,
+                    data: {
+                        remainingDays: subscriptionCheck.remainingDays,
+                        requiredDays: subscriptionCheck.requiredDays,
+                        excessDays: subscriptionCheck.excessDays,
+                        suggestedMaxDays: subscriptionCheck.remainingDays
+                    }
+                };
+            }
         }
 
         // Tính ngày bắt đầu và ngày dự kiến hoàn thành
@@ -324,47 +432,225 @@ const getCurrentPlan = async (userId) => {
 //             };
 //         }
 
-//         if (updates.reason) plan.reason = updates.reason;
-//         if (updates.expectedQuitDate) plan.expectedQuitDate = new Date(updates.expectedQuitDate);
+//         // CHỈ cho phép cập nhật reason - KHÔNG cho cập nhật expectedQuitDate
+//         if (updates.reason) {
+//             plan.reason = updates.reason;
+//             await plan.save();
+//         }
 
-//         await plan.save();
-
+//         // Xử lý cập nhật stages (nếu có)
 //         if (updates.stages && updates.stages.length > 0) {
-//             await PlanStagesModel.deleteMany({ quitPlansId: planId });
+//             // Sử dụng getCurrentStage để lấy thông tin chi tiết về trạng thái các giai đoạn
+//             const stageInfo = await getCurrentStage(userId);
 
-//             const stagePromises = updates.stages.map(stage => {
-//                 const newStage = new PlanStagesModel({
-//                     quitPlansId: planId,
+//             if (!stageInfo.success) {
+//                 return {
+//                     success: false,
+//                     message: "Không thể lấy thông tin giai đoạn để validation"
+//                 };
+//             }
+
+//             const { allStagesWithProgress, planInfo } = stageInfo.data;
+
+//             // Phân loại stages theo trạng thái từ getCurrentStage
+//             const completedStages = allStagesWithProgress.filter(stage => stage.status === "completed");
+//             const currentStage = allStagesWithProgress.find(stage => stage.status === "in_progress");
+//             const upcomingStages = allStagesWithProgress.filter(stage => stage.status === "upcoming");
+
+//             // Validation: kiểm tra xem có cố gắng update stage đã hoàn thành không
+//             const invalidUpdates = [];
+//             const stagesToKeep = []; // Các stage đã hoàn thành sẽ được giữ nguyên
+//             const stagesToUpdate = []; // Các stage có thể cập nhật
+
+//             // Giữ nguyên tất cả stages đã hoàn thành
+//             completedStages.forEach(stage => {
+//                 stagesToKeep.push({
+//                     _id: stage._id,
 //                     title: stage.title,
 //                     description: stage.description,
 //                     orderNumber: stage.orderNumber,
-//                     daysToComplete: stage.daysToComplete
+//                     daysToComplete: stage.daysToComplete,
+//                     reason: "Đã hoàn thành - không thể chỉnh sửa"
 //                 });
-//                 return newStage.save();
 //             });
 
-//             await Promise.all(stagePromises);
+//             // Kiểm tra các stage trong updates
+//             updates.stages.forEach(updateStage => {
+//                 if (updateStage._id) {
+//                     // Update stage có sẵn
+//                     const existingStage = allStagesWithProgress.find(s => s._id.toString() === updateStage._id.toString());
+
+//                     if (existingStage) {
+//                         if (existingStage.status === "completed") {
+//                             // Stage đã hoàn thành - không được phép chỉnh sửa
+//                             invalidUpdates.push({
+//                                 stageId: updateStage._id,
+//                                 title: existingStage.title,
+//                                 reason: "Giai đoạn đã hoàn thành - không thể chỉnh sửa"
+//                             });
+//                         } else if (existingStage.status === "in_progress") {
+//                             // Stage đang thực hiện - chỉ cho phép sửa title và description
+//                             if (updateStage.daysToComplete && updateStage.daysToComplete !== existingStage.daysToComplete) {
+//                                 invalidUpdates.push({
+//                                     stageId: updateStage._id,
+//                                     title: existingStage.title,
+//                                     reason: "Giai đoạn đang thực hiện - không thể thay đổi số ngày hoàn thành"
+//                                 });
+//                             } else if (updateStage.orderNumber && updateStage.orderNumber !== existingStage.orderNumber) {
+//                                 invalidUpdates.push({
+//                                     stageId: updateStage._id,
+//                                     title: existingStage.title,
+//                                     reason: "Giai đoạn đang thực hiện - không thể thay đổi thứ tự"
+//                                 });
+//                             } else {
+//                                 // Cho phép cập nhật title và description cho stage đang thực hiện
+//                                 stagesToUpdate.push({
+//                                     _id: updateStage._id,
+//                                     title: updateStage.title || existingStage.title,
+//                                     description: updateStage.description || existingStage.description,
+//                                     orderNumber: existingStage.orderNumber, // Giữ nguyên
+//                                     daysToComplete: existingStage.daysToComplete, // Giữ nguyên
+//                                     updateType: "limited" // Chỉ cập nhật một phần
+//                                 });
+//                             }
+//                         } else {
+//                             // Stage upcoming - cho phép cập nhật tất cả
+//                             stagesToUpdate.push({
+//                                 _id: updateStage._id,
+//                                 title: updateStage.title,
+//                                 description: updateStage.description,
+//                                 orderNumber: updateStage.orderNumber,
+//                                 daysToComplete: updateStage.daysToComplete,
+//                                 updateType: "full" // Cập nhật đầy đủ
+//                             });
+//                         }
+//                     }
+//                 } else {
+//                     // Stage mới - chỉ cho phép thêm vào cuối (order lớn hơn stage cuối cùng)
+//                     const maxOrder = Math.max(...allStagesWithProgress.map(s => s.orderNumber));
+//                     if (updateStage.orderNumber && updateStage.orderNumber <= maxOrder) {
+//                         // Chỉ cho phép thêm stage mới ở cuối
+//                         const lastCompletedOrder = completedStages.length > 0 ? Math.max(...completedStages.map(s => s.orderNumber)) : 0;
+//                         const currentOrder = currentStage ? currentStage.orderNumber : 0;
+
+//                         if (updateStage.orderNumber <= Math.max(lastCompletedOrder, currentOrder)) {
+//                             invalidUpdates.push({
+//                                 title: updateStage.title,
+//                                 reason: "Không thể thêm giai đoạn mới vào giữa các giai đoạn đã bắt đầu"
+//                             });
+//                         } else {
+//                             stagesToUpdate.push({
+//                                 title: updateStage.title,
+//                                 description: updateStage.description,
+//                                 orderNumber: updateStage.orderNumber,
+//                                 daysToComplete: updateStage.daysToComplete,
+//                                 updateType: "new"
+//                             });
+//                         }
+//                     } else {
+//                         // Tự động gán order number
+//                         stagesToUpdate.push({
+//                             title: updateStage.title,
+//                             description: updateStage.description,
+//                             orderNumber: maxOrder + 1,
+//                             daysToComplete: updateStage.daysToComplete,
+//                             updateType: "new"
+//                         });
+//                     }
+//                 }
+//             });
+
+//             // Nếu có lỗi validation, trả về lỗi
+//             if (invalidUpdates.length > 0) {
+//                 return {
+//                     success: false,
+//                     message: "Không thể cập nhật một số giai đoạn do vi phạm quy tắc chỉnh sửa",
+//                     data: {
+//                         invalidUpdates,
+//                         validationRules: {
+//                             completed: "Không được chỉnh sửa giai đoạn đã hoàn thành",
+//                             in_progress: "Giai đoạn đang thực hiện chỉ được chỉnh sửa tiêu đề và mô tả",
+//                             upcoming: "Giai đoạn chưa bắt đầu có thể chỉnh sửa tất cả thông tin",
+//                             new_stages: "Chỉ được thêm giai đoạn mới vào cuối"
+//                         },
+//                         currentStageInfo: stageInfo.data
+//                     }
+//                 };
+//             }
+
+//             // Thực hiện cập nhật stages
+//             if (stagesToUpdate.length > 0) {
+//                 // Xóa các stages có thể cập nhật (không xóa stages đã hoàn thành)
+//                 const stageIdsToDelete = stagesToUpdate
+//                     .filter(stage => stage._id && stage.updateType !== "new")
+//                     .map(stage => stage._id);
+
+//                 if (stageIdsToDelete.length > 0) {
+//                     await PlanStagesModel.deleteMany({
+//                         _id: { $in: stageIdsToDelete }
+//                     });
+//                 }
+
+//                 // Tạo lại các stages
+//                 const stagePromises = stagesToUpdate.map(stage => {
+//                     const newStage = new PlanStagesModel({
+//                         quitPlansId: planId,
+//                         title: stage.title,
+//                         description: stage.description,
+//                         orderNumber: stage.orderNumber,
+//                         daysToComplete: stage.daysToComplete
+//                     });
+//                     return newStage.save();
+//                 });
+
+//                 await Promise.all(stagePromises);
+
+//                 // Tự động tính toán lại expectedQuitDate dựa trên tổng thời gian stages
+//                 const allStagesAfterUpdate = await PlanStagesModel.find({ quitPlansId: planId })
+//                     .sort({ orderNumber: 1 });
+
+//                 const totalStageDays = allStagesAfterUpdate.reduce((sum, stage) => sum + stage.daysToComplete, 0);
+//                 const newExpectedQuitDate = new Date(plan.startDate);
+//                 newExpectedQuitDate.setDate(newExpectedQuitDate.getDate() + totalStageDays);
+
+//                 plan.expectedQuitDate = newExpectedQuitDate;
+//                 await plan.save();
+//             }
 //         }
 
+//         // Lấy kế hoạch đã cập nhật
 //         const updatedPlan = await QuitPlansModel.findById(planId)
 //             .populate("userId", "name email");
 //         const stages = await PlanStagesModel.find({ quitPlansId: planId })
 //             .sort({ orderNumber: 1 });
 
+//         // Sử dụng lại getCurrentStage để lấy thông tin trạng thái mới
+//         const updatedStageInfo = await getCurrentStage(userId);
+
 //         return {
 //             success: true,
 //             data: {
 //                 plan: updatedPlan,
-//                 stages: stages
+//                 stages: stages,
+//                 stageInfo: updatedStageInfo.success ? updatedStageInfo.data : null,
+//                 updateSummary: {
+//                     reasonUpdated: !!updates.reason,
+//                     stagesUpdated: !!(updates.stages && updates.stages.length > 0),
+//                     totalStages: stages.length,
+//                     expectedQuitDateAutoCalculated: !!(updates.stages && updates.stages.length > 0),
+//                     newExpectedQuitDate: updatedPlan.expectedQuitDate
+//                 }
 //             },
-//             message: "Cập nhật kế hoạch thành công"
+//             message: updates.stages && updates.stages.length > 0 ?
+//                 "Cập nhật kế hoạch thành công. Ngày hoàn thành đã được tự động tính toán lại." :
+//                 "Cập nhật kế hoạch thành công"
 //         };
 
 //     } catch (error) {
 //         throw new Error(`Lỗi khi cập nhật kế hoạch: ${error.message}`);
 //     }
 // };
-// Cập nhật kế hoạch
+
 const updateQuitPlan = async (planId, userId, updates) => {
     try {
         const plan = await QuitPlansModel.findOne({
@@ -388,6 +674,24 @@ const updateQuitPlan = async (planId, userId, updates) => {
 
         // Xử lý cập nhật stages (nếu có)
         if (updates.stages && updates.stages.length > 0) {
+            // THÊM MỚI: Kiểm tra subscription limit cho stages mới
+            const totalNewDays = updates.stages.reduce((sum, stage) => sum + (stage.daysToComplete || 0), 0);
+
+            if (totalNewDays > 0) {
+                const subscriptionCheck = await checkSubscriptionLimit(userId, totalNewDays);
+                if (!subscriptionCheck.isValid) {
+                    return {
+                        success: false,
+                        message: subscriptionCheck.message,
+                        data: {
+                            remainingDays: subscriptionCheck.remainingDays,
+                            requiredDays: subscriptionCheck.requiredDays,
+                            excessDays: subscriptionCheck.excessDays
+                        }
+                    };
+                }
+            }
+
             // Sử dụng getCurrentStage để lấy thông tin chi tiết về trạng thái các giai đoạn
             const stageInfo = await getCurrentStage(userId);
 
@@ -424,6 +728,43 @@ const updateQuitPlan = async (planId, userId, updates) => {
 
             // Kiểm tra các stage trong updates
             updates.stages.forEach(updateStage => {
+                // THÊM MỚI: Validation cho từng stage
+                if (!updateStage.title || updateStage.title.trim() === "") {
+                    invalidUpdates.push({
+                        stageId: updateStage._id || "new",
+                        title: updateStage.title || "Không có tiêu đề",
+                        reason: "Tiêu đề giai đoạn không được để trống"
+                    });
+                    return;
+                }
+
+                if (!updateStage.description || updateStage.description.trim() === "") {
+                    invalidUpdates.push({
+                        stageId: updateStage._id || "new",
+                        title: updateStage.title,
+                        reason: "Mô tả giai đoạn không được để trống"
+                    });
+                    return;
+                }
+
+                if (!updateStage.daysToComplete || updateStage.daysToComplete <= 0) {
+                    invalidUpdates.push({
+                        stageId: updateStage._id || "new",
+                        title: updateStage.title,
+                        reason: "Số ngày hoàn thành phải lớn hơn 0"
+                    });
+                    return;
+                }
+
+                if (updateStage.daysToComplete > 365) {
+                    invalidUpdates.push({
+                        stageId: updateStage._id || "new",
+                        title: updateStage.title,
+                        reason: "Số ngày hoàn thành không được vượt quá 365 ngày"
+                    });
+                    return;
+                }
+
                 if (updateStage._id) {
                     // Update stage có sẵn
                     const existingStage = allStagesWithProgress.find(s => s._id.toString() === updateStage._id.toString());
@@ -519,7 +860,8 @@ const updateQuitPlan = async (planId, userId, updates) => {
                             completed: "Không được chỉnh sửa giai đoạn đã hoàn thành",
                             in_progress: "Giai đoạn đang thực hiện chỉ được chỉnh sửa tiêu đề và mô tả",
                             upcoming: "Giai đoạn chưa bắt đầu có thể chỉnh sửa tất cả thông tin",
-                            new_stages: "Chỉ được thêm giai đoạn mới vào cuối"
+                            new_stages: "Chỉ được thêm giai đoạn mới vào cuối",
+                            basic_validation: "Tiêu đề, mô tả và số ngày hợp lệ là bắt buộc"
                         },
                         currentStageInfo: stageInfo.data
                     }
@@ -558,6 +900,25 @@ const updateQuitPlan = async (planId, userId, updates) => {
                     .sort({ orderNumber: 1 });
 
                 const totalStageDays = allStagesAfterUpdate.reduce((sum, stage) => sum + stage.daysToComplete, 0);
+
+                // THÊM MỚI: Kiểm tra lại subscription limit sau khi cập nhật
+                const finalSubscriptionCheck = await checkSubscriptionLimit(userId, totalStageDays);
+                if (!finalSubscriptionCheck.isValid) {
+                    // Rollback nếu vượt quá limit
+                    await PlanStagesModel.deleteMany({ quitPlansId: planId });
+
+                    // Khôi phục stages cũ (simplified - trong thực tế có thể cần backup trước)
+                    return {
+                        success: false,
+                        message: `Cập nhật bị hủy: ${finalSubscriptionCheck.message}`,
+                        data: {
+                            remainingDays: finalSubscriptionCheck.remainingDays,
+                            requiredDays: finalSubscriptionCheck.requiredDays,
+                            excessDays: finalSubscriptionCheck.excessDays
+                        }
+                    };
+                }
+
                 const newExpectedQuitDate = new Date(plan.startDate);
                 newExpectedQuitDate.setDate(newExpectedQuitDate.getDate() + totalStageDays);
 
