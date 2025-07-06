@@ -1,33 +1,13 @@
 const mongoose = require("mongoose");
 
+// bang nay luu cac goi dich vu nguoi dung co the dang ky
 const membershipSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     price: { type: Number, required: true },
-    duration: { type: Number, required: true },
+    duration: { type: Number, required: true }, // tinh theo ngay
     description: { type: String, required: false },
-    features: [{
-      type: String,
-      enum: [
-        'daily_tracking',
-        'chat_with_coach',
-        'achievement_badges',
-        'personalized_plan',
-        'priority_support',
-        'advanced_analytics',
-        'community_access',
-        'motivational_notifications'
-      ]
-    }],
-    maxCoachSessions: { type: Number, default: 0 },
-    isActive: { type: Boolean, default: true },
-    tier: { 
-      type: String, 
-      enum: ['basic', 'premium', 'vip'],
-      required: true 
-    },
-    benefits: [String],
-    limitations: [String]
+    isDeleted: { type: Boolean, default: false },
   },
   {
     timestamps: true,

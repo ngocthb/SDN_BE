@@ -2,7 +2,7 @@ const UserServices = require("../services/UserService");
 const AuthService = require("../services/AuthService");
 const createUser = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, confirmPassword } = req.body;
     if (
       !name ||
       !name.trim() ||
@@ -15,7 +15,7 @@ const createUser = async (req, res) => {
         .status(400)
         .json({ status: "ERR", message: "All fields are required" });
     }
-    const createUser = await UserServices.createUser(name, email, password);
+    const createUser = await UserServices.createUser(name, email, password, confirmPassword);
     if (!createUser) {
       return res.status(400).json({ status: "ERR", message: message });
     }
