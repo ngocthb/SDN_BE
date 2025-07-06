@@ -106,10 +106,36 @@ const startSubscriptionExpirationCron = () => {
     console.log("✅ Đã khởi tạo cron job kiểm tra subscription sắp hết hạn lúc 9:00 sáng");
 };
 
+// THÊM MỚI: Cron job cập nhật subscription hết hạn
+const startSubscriptionMaintenanceCron = () => {
+    // Chạy hàng ngày lúc 7:00 sáng để cập nhật subscription hết hạn
+    cron.schedule("0 0 7 * * *", async () => {
+        console.log("🔧 Bắt đầu cập nhật subscription hết hạn...");
+
+        try {
+            const result = await SubscriptionReminderService.updateExpiredSubscriptions();
+
+            if (result.success) {
+                console.log(`✅ Cập nhật subscription hoàn thành: ${result.data.updatedCount} subscription đã cập nhật expired`);
+            } else {
+                console.error(`❌ Lỗi cập nhật subscription: ${result.message}`);
+            }
+        } catch (error) {
+            console.error("❌ Lỗi cron job cập nhật subscription:", error.message);
+        }
+    }, {
+        scheduled: true,
+        timezone: "Asia/Ho_Chi_Minh"
+    });
+
+    console.log("✅ Đã khởi tạo cron job cập nhật subscription hết hạn lúc 7:00 sáng");
+};
+
 module.exports = {
     startDailyReminderCron,
     startTestReminderCron,
     startDailySummaryCron,
     startAutoCompleteCron,
-    startSubscriptionExpirationCron
+    startSubscriptionExpirationCron,
+    startSubscriptionMaintenanceCron
 };

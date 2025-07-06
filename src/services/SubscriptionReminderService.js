@@ -190,6 +190,87 @@ const checkAndSendExpirationWarnings = async () => {
     }
 };
 
+const updateExpiredSubscriptions = async () => {
+    try {
+        console.log(`🕐 [${new Date().toLocaleString('vi-VN')}] Bắt đầu kiểm tra và cập nhật subscription hết hạn...`);
+
+        const now = new Date();
+
+        // Tìm tất cả subscription có status "active" nhưng đã hết hạn
+        const expiredSubscriptions = await SubscriptionModel.find({
+            status: "active",
+            endDate: { $lt: now } // endDate < hiện tại
+        }).populate("userId", "name email")
+            .populate("membershipId", "name price duration");
+
+        console.log(`🔍 Tìm thấy ${expiredSubscriptions.length} subscription đã hết hạn nhưng chưa cập nhật trạng thái`);
+
+        if (expiredSubscriptions.length === 0) {
+            return {
+                success: true,
+                data: {
+                    totalChecked: 0,
+                    updatedCount: 0,
+                    executionTime: new Date().toLocaleString('vi-VN')
+                },
+                message: "Không có subscription nào cần cập nhật trạng thái"
+            };
+        }
+
+        let updatedCount = 0;
+        let updateErrors = 0;
+
+        // Cập nhật từng subscription
+        for (const subscription of expiredSubscriptions) {
+            try {
+                const expiredDays = Math.floor((now - new Date(subscription.endDate)) / (1000 * 60 * 60 * 24));
+
+                await SubscriptionModel.findByIdAndUpdate(subscription._id, {
+                    status: "expired"
+                });
+
+                updatedCount++;
+
+                console.log(`✅ Đã cập nhật subscription ${subscription._id} của user ${subscription.userId.name || subscription.userId.email} - hết hạn ${expiredDays} ngày`);
+
+            } catch (updateError) {
+                updateErrors++;
+                console.error(`❌ Lỗi cập nhật subscription ${subscription._id}:`, updateError.message);
+            }
+        }
+
+        const result = {
+            success: true,
+            data: {
+                totalChecked: expiredSubscriptions.length,
+                updatedCount,
+                updateErrors,
+                executionTime: new Date().toLocaleString('vi-VN'),
+                expiredSubscriptions: expiredSubscriptions.map(sub => ({
+                    subscriptionId: sub._id,
+                    userId: sub.userId._id,
+                    userEmail: sub.userId.email,
+                    membershipName: sub.membershipId.name,
+                    endDate: sub.endDate,
+                    expiredDays: Math.floor((now - new Date(sub.endDate)) / (1000 * 60 * 60 * 24))
+                }))
+            },
+            message: `Hoàn thành cập nhật subscription hết hạn: ${updatedCount} đã cập nhật, ${updateErrors} lỗi`
+        };
+
+        console.log(`📊 Kết quả cập nhật subscription hết hạn: ${updatedCount}/${expiredSubscriptions.length} thành công`);
+        return result;
+
+    } catch (error) {
+        console.error("❌ Lỗi kiểm tra và cập nhật subscription hết hạn:", error.message);
+        return {
+            success: false,
+            message: error.message
+        };
+    }
+};
+
 module.exports = {
-    checkAndSendExpirationWarnings
+    checkAndSendExpirationWarnings,
+    updateExpiredSubscriptions,
 };
