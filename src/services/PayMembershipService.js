@@ -89,9 +89,9 @@ exports.confirmPayment = async (data) => {
   endDate.setDate(endDate.getDate() + membership.duration);
 
   console.log("MembershipId:", membershipId);
-console.log("UserId:", userId);
-console.log("Is valid membershipId:", mongoose.Types.ObjectId.isValid(membershipId));
-console.log("Is valid userId:", mongoose.Types.ObjectId.isValid(userId));
+  console.log("UserId:", userId);
+  console.log("Is valid membershipId:", mongoose.Types.ObjectId.isValid(membershipId));
+  console.log("Is valid userId:", mongoose.Types.ObjectId.isValid(userId));
 
   const newSubscription = await SubscriptionModel.create({
     userId: new mongoose.Types.ObjectId(userId),
