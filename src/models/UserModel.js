@@ -12,11 +12,19 @@ const userSchema = new mongoose.Schema(
       default:
         "https://icon-library.com/images/anonymous-avatar-icon/anonymous-avatar-icon-25.jpg",
     },
-    isAdmin: { type: Boolean, require, default: false },
-    isCoach: { type: Boolean, require, default: false },
+
+
+    isAdmin: { type: Boolean, default: false },
+    isCoach: { type: Boolean, default: false },
     verifyOTP: { type: String },
     verifyOTPExpires: { type: Date },
     status: { type: Boolean, default: false },
+    grantedAchievements: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "achievements",
+      },
+    ],
   },
   {
     timestamps: true,
