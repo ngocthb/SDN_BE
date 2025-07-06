@@ -19,7 +19,9 @@ const logDailyProgress = async (userId, cigarettesPerDay, healthNote = "", mood 
         // Kiểm tra xem có kế hoạch cai thuốc đang active không
         const activePlan = await QuitPlansModel.findOne({
             userId: userId,
-            isActive: true
+            isActive: true,
+            startDate: { $lte: new Date() },
+            expectedQuitDate: { $gte: new Date() }
         });
 
         if (!activePlan) {
@@ -45,6 +47,7 @@ const logDailyProgress = async (userId, cigarettesPerDay, healthNote = "", mood 
 
         const existingLog = await ProgressLogsModel.findOne({
             userId: userId,
+            quitPlanId: activePlan._id,
             date: {
                 $gte: today,
                 $lt: tomorrow
@@ -70,6 +73,7 @@ const logDailyProgress = async (userId, cigarettesPerDay, healthNote = "", mood 
             // Tạo log mới
             const newLog = new ProgressLogsModel({
                 userId: userId,
+                quitPlanId: activePlan._id,
                 cigarettesPerDay: cigarettesPerDay,
                 healthNote: healthNote,
                 mood: mood,
@@ -78,7 +82,8 @@ const logDailyProgress = async (userId, cigarettesPerDay, healthNote = "", mood 
 
             const savedLog = await newLog.save();
             const populatedLog = await ProgressLogsModel.findById(savedLog._id)
-                .populate("userId", "name email");
+                .populate("userId", "name email")
+                .populate("quitPlanId", "reason startDate expectedQuitDate");
 
             const newAchievements = await achievementService.evaluateAndGrantAchievements(userId);
 
@@ -109,7 +114,8 @@ const getProgressLogs = async (userId, startDate, endDate, limit = 30) => {
         const logs = await ProgressLogsModel.find(query)
             .sort({ date: -1 })
             .limit(limit)
-            .populate("userId", "name email");
+            .populate("userId", "name email")
+            .populate("quitPlanId", "reason startDate expectedQuitDate isActive");
 
         return {
             success: true,
