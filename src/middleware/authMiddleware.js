@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
 dotenv.config();
-
+const asyncHandler = require("express-async-handler");
 // middleware dịch token sang thông tin người dùng
 const authUserMiddleware = (req, res, next) => {
   try {
@@ -55,6 +55,7 @@ const authCoachMiddleware = (req, res, next) => {
     });
   }
 };
+
 
 module.exports = {
   authUserMiddleware,

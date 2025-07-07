@@ -9,6 +9,11 @@ const progressLogsSchema = new mongoose.Schema(
       ref: "users",
       required: true,
     },
+    quitPlanId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "quitPlans",
+      required: false, // Hoặc true nếu bắt buộc xác định kế hoạch
+    },
     cigarettesPerDay: {
       type: Number,
       required: true,

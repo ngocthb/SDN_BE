@@ -7,6 +7,7 @@ const membershipSchema = new mongoose.Schema(
     price: { type: Number, required: true },
     duration: { type: Number, required: true }, // tinh theo ngay
     description: { type: String, required: false },
+    isDeleted: { type: Boolean, default: false },
   },
   {
     timestamps: true,

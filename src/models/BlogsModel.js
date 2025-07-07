@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-//chi co admin hoac coach moi duoc tao bai viet
+//user tao bai viet
 const blogsSchema = new mongoose.Schema(
   {
     title: {

@@ -5,22 +5,19 @@ const commentsSchema = new mongoose.Schema(
     content: {
       type: String,
       required: true,
+      minlength: 1,
+      maxlength: 500,
     }, // Nội dung bình luận
     authorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "users",
       required: true,
     }, // Người viết bình luận
-    communityPostId: {
+    blogId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "communityPosts",
+      ref: "blogs",
       required: true,
     }, // Bài viết mà bình luận thuộc về
-    likes: {
-      type: Number,
-      default: 0,
-      min: 0,
-    }, // Số lượt thích bình luận
   },
   {
     timestamps: true,
