@@ -183,6 +183,14 @@ const createQuitPlan = async (userId, reason, customStages = null) => {
 
         // Lấy thông tin tình trạng hút thuốc
         const smokingStatus = await SmokingStatusModel.findOne({ userId: userId });
+
+        if (!smokingStatus) {
+            return {
+                success: false,
+                message: "Vui lòng cập nhật thông tin tình trạng hút thuốc trước khi tạo kế hoạch"
+            };
+        }
+        
         let planTemplate;
 
         if (customStages && customStages.length > 0) {
