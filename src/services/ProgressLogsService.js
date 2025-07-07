@@ -137,8 +137,21 @@ const getProgressStatistics = async (userId) => {
             isActive: true
         });
 
+        if (!currentPlan) {
+            return {
+                success: false,
+                message: "Bạn cần có kế hoạch cai thuốc đang thực hiện để thống kê tiến trình. Vui lòng tạo kế hoạch cai thuốc trước."
+            };
+        }
+
         // Lấy thông tin hút thuốc ban đầu
         const smokingStatus = await SmokingStatusModel.findOne({ userId: userId });
+        if (!smokingStatus) {
+            return {
+                success: false,
+                message: "Vui lòng cập nhật thông tin tình trạng hút thuốc trước khi thống kê tiến trình"
+            };
+        }
 
         // Lấy tất cả logs
         const allLogs = await ProgressLogsModel.find({ userId: userId })

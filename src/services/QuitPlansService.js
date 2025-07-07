@@ -190,7 +190,7 @@ const createQuitPlan = async (userId, reason, customStages = null) => {
                 message: "Vui lòng cập nhật thông tin tình trạng hút thuốc trước khi tạo kế hoạch"
             };
         }
-        
+
         let planTemplate;
 
         if (customStages && customStages.length > 0) {
@@ -332,7 +332,7 @@ const getSuggestedPlan = async (userId) => {
         if (!smokingStatus) {
             return {
                 success: false,
-                message: "Vui lòng cập nhật thông tin tình trạng hút thuốc trước khi tạo kế hoạch"
+                message: "Vui lòng cập nhật thông tin tình trạng hút thuốc trước khi lấy gợi ý kế hoạch"
             };
         }
 
