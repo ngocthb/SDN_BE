@@ -380,7 +380,7 @@ const getCurrentPlan = async (userId) => {
 
         if (!currentPlan) {
             return {
-                success: false,
+                success: true,
                 data: null,
                 message: "Chưa có kế hoạch cai thuốc nào đang thực hiện"
             };
@@ -1764,7 +1764,7 @@ const getCurrentStage = async (userId) => {
 
         if (!currentPlan) {
             return {
-                success: false,
+                success: true,
                 message: "Không có kế hoạch cai thuốc nào đang thực hiện"
             };
         }

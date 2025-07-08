@@ -180,8 +180,8 @@ const getTodayProgress = async (req, res) => {
 
         const result = await ProgressLogsService.getProgressLogs(
             userId,
-            today.toISOString().split('T')[0], // "2025-07-08"
-            today.toISOString().split('T')[0], // Same day
+            today,
+            tomorrow,
             1
         );
 

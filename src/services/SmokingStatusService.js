@@ -65,7 +65,7 @@ const getSmokingStatus = async (userId) => {
 
         if (!smokingStatus) {
             return {
-                success: false,
+                success: true,
                 data: null,
                 message: "Chưa có thông tin về tình trạng hút thuốc"
             };
