@@ -1,11 +1,14 @@
 const MembershipServices = require("../services/MembershipService");
+const AdminMembershipStatisticsService = require("../services/AdminMembershipStatisticsService");
 
 // User: chỉ lấy các gói chưa xóa
 const getMemberships = async (req, res) => {
   try {
     const response = await MembershipServices.getMemberships();
     if (!response) {
-      return res.status(404).json({ status: "ERR", message: "No memberships found" });
+      return res
+        .status(404)
+        .json({ status: "ERR", message: "No memberships found" });
     }
     return res.status(200).json({ status: "OK", data: response });
   } catch (error) {
@@ -19,7 +22,9 @@ const getMembershipById = async (req, res) => {
   try {
     const response = await MembershipServices.getMembershipById(id);
     if (!response) {
-      return res.status(404).json({ status: "ERR", message: "Membership not found" });
+      return res
+        .status(404)
+        .json({ status: "ERR", message: "Membership not found" });
     }
     return res.status(200).json({ status: "OK", data: response });
   } catch (error) {
@@ -32,7 +37,9 @@ const getAllMemberships = async (req, res) => {
   try {
     const response = await MembershipServices.getAllMemberships();
     if (!response) {
-      return res.status(404).json({ status: "ERR", message: "No memberships found" });
+      return res
+        .status(404)
+        .json({ status: "ERR", message: "No memberships found" });
     }
     return res.status(200).json({ status: "OK", data: response });
   } catch (error) {
@@ -46,7 +53,9 @@ const getMembershipByIdAdmin = async (req, res) => {
   try {
     const response = await MembershipServices.getMembershipByIdAdmin(id);
     if (!response) {
-      return res.status(404).json({ status: "ERR", message: "Membership not found" });
+      return res
+        .status(404)
+        .json({ status: "ERR", message: "Membership not found" });
     }
     return res.status(200).json({ status: "OK", data: response });
   } catch (error) {
@@ -68,7 +77,13 @@ const createMembership = async (req, res) => {
         .status(400)
         .json({ status: "ERR", message: "Failed to create membership" });
     }
-    return res.status(200).json({ status: "OK", message: "Membership created successfully", data: response });
+    return res
+      .status(200)
+      .json({
+        status: "OK",
+        message: "Membership created successfully",
+        data: response,
+      });
   } catch (error) {
     return res.status(404).json({ message: error.message });
   }
@@ -84,7 +99,13 @@ const updateMembership = async (req, res) => {
         .status(404)
         .json({ status: "ERR", message: "Membership not found" });
     }
-    return res.status(200).json({ status: "OK", message: "Membership updated successfully", data: response });
+    return res
+      .status(200)
+      .json({
+        status: "OK",
+        message: "Membership updated successfully",
+        data: response,
+      });
   } catch (error) {
     return res.status(404).json({ message: error.message });
   }
@@ -99,7 +120,9 @@ const deleteMembership = async (req, res) => {
         .status(404)
         .json({ status: "ERR", message: "Membership not found" });
     }
-    return res.status(200).json({ status: "OK", message: "Membership deleted successfully" });
+    return res
+      .status(200)
+      .json({ status: "OK", message: "Membership deleted successfully" });
   } catch (error) {
     return res.status(404).json({ message: error.message });
   }
@@ -114,9 +137,28 @@ const restoreMembership = async (req, res) => {
         .status(404)
         .json({ status: "ERR", message: "Membership not found" });
     }
-    return res.status(200).json({ status: "OK", message: "Membership restored successfully" });
+    return res
+      .status(200)
+      .json({ status: "OK", message: "Membership restored successfully" });
   } catch (error) {
     return res.status(404).json({ message: error.message });
+  }
+};
+
+const getMembershipStatistics = async (req, res) => {
+  try {
+    const statistics =
+      await AdminMembershipStatisticsService.getMembershipStatistics();
+    return res.status(200).json({
+      status: "OK",
+      message: "Get membership statistics successfully",
+      data: statistics,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "ERR",
+      message: error.message,
+    });
   }
 };
 
@@ -129,4 +171,5 @@ module.exports = {
   updateMembership,
   deleteMembership,
   restoreMembership,
+  getMembershipStatistics,
 };

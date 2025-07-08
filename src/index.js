@@ -10,8 +10,6 @@ dotenv.config();
 const cors = require("cors");
 const bodyParser = require("body-parser");
 
-const routes = require("./routes");
-
 const {
   startDailyReminderCron,
   startDailySummaryCron,
@@ -23,18 +21,10 @@ const {
 
 const setupSocket = require("./config/socket");
 
-const http = require("http");
-
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, {
-  cors: {
-    origin: ["http://localhost:3000", "http://localhost:5173"], // Frontend URLs
-    methods: ["GET", "POST"],
-  },
-});
 
 const port = process.env.PORT;
 
@@ -54,17 +44,14 @@ startSubscriptionMaintenanceCron(); // Cập nhật subscription hết hạn lú
 
 routes(app);
 
-// Socket.IO connection handling
-io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
-
-  socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
-  });
+const io = socketIo(server, {
+  pingTimeout: 60000, // Giữ kết nối lâu hơn
+  cors: {
+    origin: ["http://localhost:3000", "http://localhost:5173"], // Đa frontend
+    credentials: true, // Cho phép gửi cookie/auth header
+    methods: ["GET", "POST"],
+  },
 });
-
-// Tạo server HTTP
-const server = http.createServer(app);
 
 // Kết nối MongoDB
 
@@ -77,14 +64,6 @@ mongoose
   .catch((error) => {
     console.error("❌ MongoDB connection error:", error);
   });
-
-const io = require("socket.io")(server, {
-  pingTimeout: 60000,
-  cors: {
-    origin: "http://localhost:3000",
-    credentials: true, // ✅ BẮT BUỘC phải có dòng này
-  },
-});
 
 setupSocket(io);
 
