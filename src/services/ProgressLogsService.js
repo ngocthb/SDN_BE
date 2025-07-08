@@ -4,6 +4,12 @@ const SmokingStatusModel = require("../models/SmokingStatusModel");
 const UserModel = require("../models/UserModel");
 const achievementService = require("../services/AchievementService")
 
+const normalizeDate = (date) => {
+    const normalized = new Date(date);
+    normalized.setHours(0, 0, 0, 0);
+    return normalized;
+};
+
 // Ghi nhận tiến trình hàng ngày
 const logDailyProgress = async (userId, cigarettesPerDay, healthNote = "", mood = "") => {
     try {
@@ -212,10 +218,10 @@ const getProgressStatistics = async (userId) => {
         // Tính % tiến trình dựa trên kế hoạch
         let progressPercentage = 0;
         if (currentPlan) {
-            const planStartDate = currentPlan.startDate;
-            const planEndDate = currentPlan.expectedQuitDate;
-            const totalPlanDays = Math.ceil((planEndDate - planStartDate) / (1000 * 60 * 60 * 24));
-            const daysPassed = Math.ceil((new Date() - planStartDate) / (1000 * 60 * 60 * 24));
+            const planStartDate = normalizeDate(currentPlan.startDate);
+            const planEndDate = normalizeDate(currentPlan.expectedQuitDate);
+            const totalPlanDays = Math.floor((planEndDate - planStartDate) / (1000 * 60 * 60 * 24));
+            const daysPassed = Math.floor((normalizeDate(new Date()) - planStartDate) / (1000 * 60 * 60 * 24));
             progressPercentage = Math.min(Math.round((daysPassed / totalPlanDays) * 100), 100);
         }
 
@@ -327,12 +333,75 @@ const getHealthImprovements = (daysWithoutSmoking) => {
     return improvements;
 };
 
+// // Lấy biểu đồ tiến trình
+// const getProgressChart = async (userId, days = 30) => {
+//     try {
+//         const endDate = new Date();
+//         const startDate = new Date();
+//         startDate.setDate(endDate.getDate() - days);
+
+//         const logs = await ProgressLogsModel.find({
+//             userId: userId,
+//             date: {
+//                 $gte: startDate,
+//                 $lte: endDate
+//             }
+//         }).sort({ date: 1 });
+
+//         // Tạo dữ liệu cho biểu đồ
+//         const chartData = [];
+//         const currentDate = new Date(startDate);
+
+//         while (currentDate <= endDate) {
+//             const dateString = currentDate.toISOString().split('T')[0];
+//             const log = logs.find(l => l.date.toISOString().split('T')[0] === dateString);
+
+//             chartData.push({
+//                 date: dateString,
+//                 cigarettesPerDay: log ? log.cigarettesPerDay : null,
+//                 mood: log ? log.mood : null,
+//                 hasHealthNote: log ? (log.healthNote && log.healthNote.trim() !== '') : false
+//             });
+
+//             currentDate.setDate(currentDate.getDate() + 1);
+//         }
+
+//         return {
+//             success: true,
+//             data: {
+//                 chartData: chartData,
+//                 summary: {
+//                     totalLogs: logs.length,
+//                     averageCigarettes: logs.length > 0
+//                         ? Math.round((logs.reduce((sum, log) => sum + log.cigarettesPerDay, 0) / logs.length) * 100) / 100
+//                         : 0,
+//                     smokeFreedays: logs.filter(log => log.cigarettesPerDay === 0).length
+//                 }
+//             },
+//             message: `Lấy biểu đồ tiến trình ${days} ngày thành công`
+//         };
+
+//     } catch (error) {
+//         throw new Error(`Lỗi khi lấy biểu đồ tiến trình: ${error.message}`);
+//     }
+// };
+
 // Lấy biểu đồ tiến trình
 const getProgressChart = async (userId, days = 30) => {
     try {
+        // ✅ FIX: Tạo date range chính xác với local timezone
         const endDate = new Date();
+        endDate.setHours(23, 59, 59, 999); // Cuối ngày hôm nay
+
         const startDate = new Date();
-        startDate.setDate(endDate.getDate() - days);
+        startDate.setDate(endDate.getDate() - days + 1); // +1 để include hôm nay
+        startDate.setHours(0, 0, 0, 0); // Đầu ngày
+
+        console.log('Chart date range:', {
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            days: days
+        });
 
         const logs = await ProgressLogsModel.find({
             userId: userId,
@@ -342,13 +411,31 @@ const getProgressChart = async (userId, days = 30) => {
             }
         }).sort({ date: 1 });
 
-        // Tạo dữ liệu cho biểu đồ
+        console.log('Found logs:', logs.map(log => ({
+            date: log.date.toISOString(),
+            cigarettes: log.cigarettesPerDay
+        })));
+
+        // ✅ FIX: Tạo dữ liệu cho biểu đồ với timezone chính xác
         const chartData = [];
         const currentDate = new Date(startDate);
 
         while (currentDate <= endDate) {
-            const dateString = currentDate.toISOString().split('T')[0];
-            const log = logs.find(l => l.date.toISOString().split('T')[0] === dateString);
+            // ✅ FIX: Sử dụng local date string thay vì ISO
+            const year = currentDate.getFullYear();
+            const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+            const day = String(currentDate.getDate()).padStart(2, '0');
+            const dateString = `${year}-${month}-${day}`;
+
+            // Tìm log cho ngày này
+            const log = logs.find(l => {
+                const logDate = new Date(l.date);
+                const logYear = logDate.getFullYear();
+                const logMonth = String(logDate.getMonth() + 1).padStart(2, '0');
+                const logDay = String(logDate.getDate()).padStart(2, '0');
+                const logDateString = `${logYear}-${logMonth}-${logDay}`;
+                return logDateString === dateString;
+            });
 
             chartData.push({
                 date: dateString,
@@ -359,6 +446,8 @@ const getProgressChart = async (userId, days = 30) => {
 
             currentDate.setDate(currentDate.getDate() + 1);
         }
+
+        console.log('Chart data generated:', chartData);
 
         return {
             success: true,

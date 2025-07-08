@@ -5,6 +5,12 @@ const UserModel = require("../models/UserModel");
 const nodemailer = require("nodemailer");
 const SubscriptionService = require("./SubscriptionService");
 
+const normalizeDate = (date) => {
+    const normalized = new Date(date);
+    normalized.setHours(0, 0, 0, 0);
+    return normalized;
+};
+
 // Thêm hàm helper để kiểm tra subscription và tính ngày còn lại
 const checkSubscriptionLimit = async (userId, requiredDays) => {
     try {
@@ -384,9 +390,12 @@ const getCurrentPlan = async (userId) => {
             quitPlansId: currentPlan._id
         }).sort({ orderNumber: 1 });
 
-        const now = new Date();
-        const daysPassed = Math.floor((now - currentPlan.startDate) / (1000 * 60 * 60 * 24));
-        const totalDays = Math.floor((currentPlan.expectedQuitDate - currentPlan.startDate) / (1000 * 60 * 60 * 24));
+        const startDate = normalizeDate(currentPlan.startDate);
+        const endDate = normalizeDate(currentPlan.expectedQuitDate);
+        const today = normalizeDate(new Date());
+
+        const daysPassed = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+        const totalDays = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24));
         const progressPercentage = Math.min(Math.round((daysPassed / totalDays) * 100), 100);
 
         let currentStage = null;
@@ -659,6 +668,391 @@ const getCurrentPlan = async (userId) => {
 //     }
 // };
 
+// const updateQuitPlan = async (planId, userId, updates) => {
+//     try {
+//         const plan = await QuitPlansModel.findOne({
+//             _id: planId,
+//             userId: userId,
+//             isActive: true
+//         });
+
+//         if (!plan) {
+//             return {
+//                 success: false,
+//                 message: "Không tìm thấy kế hoạch hoặc kế hoạch đã hoàn thành"
+//             };
+//         }
+
+//         // CHỈ cho phép cập nhật reason - KHÔNG cho cập nhật expectedQuitDate
+//         if (updates.reason) {
+//             plan.reason = updates.reason;
+//             await plan.save();
+//         }
+
+//         let validStageIdsToDelete = [];
+
+//         // THÊM MỚI: Validation đảm bảo ít nhất 1 stage sau khi xóa
+//         if (updates.stages && updates.stages.length === 0) {
+//             return {
+//                 success: false,
+//                 message: "Kế hoạch phải có ít nhất 1 giai đoạn"
+//             };
+//         }
+
+//         // Xử lý cập nhật stages (nếu có)
+//         if (updates.stages && updates.stages.length > 0) {
+//             // THÊM MỚI: Kiểm tra subscription limit cho stages mới
+//             const totalNewDays = updates.stages.reduce((sum, stage) => sum + (stage.daysToComplete || 0), 0);
+
+//             if (totalNewDays > 0) {
+//                 const subscriptionCheck = await checkSubscriptionLimit(userId, totalNewDays);
+//                 if (!subscriptionCheck.isValid) {
+//                     return {
+//                         success: false,
+//                         message: subscriptionCheck.message,
+//                         data: {
+//                             remainingDays: subscriptionCheck.remainingDays,
+//                             requiredDays: subscriptionCheck.requiredDays,
+//                             excessDays: subscriptionCheck.excessDays
+//                         }
+//                     };
+//                 }
+//             }
+
+//             // Sử dụng getCurrentStage để lấy thông tin chi tiết về trạng thái các giai đoạn
+//             const stageInfo = await getCurrentStage(userId);
+
+//             if (!stageInfo.success) {
+//                 return {
+//                     success: false,
+//                     message: "Không thể lấy thông tin giai đoạn để validation"
+//                 };
+//             }
+
+//             const { allStagesWithProgress, planInfo } = stageInfo.data;
+
+//             // THÊM MỚI: Logic xóa implicit (stages không có trong updates.stages)
+//             const currentStages = await PlanStagesModel.find({ quitPlansId: planId });
+//             const stageIdsInUpdate = updates.stages
+//                 .filter(stage => stage._id) // Chỉ lấy stages có _id (update existing)
+//                 .map(stage => stage._id.toString());
+
+//             // Tìm stages sẽ bị xóa (không có trong updates.stages)
+//             const stagesToDelete = allStagesWithProgress.filter(stage =>
+//                 !stageIdsInUpdate.includes(stage._id.toString())
+//             );
+
+//             // Validation: Không được xóa stages đã hoàn thành hoặc đang thực hiện
+//             const invalidDeletes = stagesToDelete.filter(stage =>
+//                 stage.status === "completed" || stage.status === "in_progress"
+//             );
+
+//             // THÊM MỚI: Kiểm tra không được xóa tất cả stages remaining
+//             const remainingStagesAfterDelete = allStagesWithProgress.filter(stage =>
+//                 stageIdsInUpdate.includes(stage._id.toString()) ||
+//                 (stage.status === "completed" || stage.status === "in_progress")
+//             );
+
+//             if (remainingStagesAfterDelete.length === 0) {
+//                 return {
+//                     success: false,
+//                     message: "Không thể xóa hết tất cả giai đoạn. Kế hoạch phải có ít nhất 1 giai đoạn."
+//                 };
+//             }
+
+//             if (invalidDeletes.length > 0) {
+//                 return {
+//                     success: false,
+//                     message: "Không thể xóa giai đoạn đã hoàn thành hoặc đang thực hiện",
+//                     data: {
+//                         invalidDeletes: invalidDeletes.map(stage => ({
+//                             stageId: stage._id,
+//                             title: stage.title,
+//                             status: stage.status,
+//                             reason: `Không thể xóa giai đoạn ${stage.status === "completed" ? "đã hoàn thành" : "đang thực hiện"}`
+//                         }))
+//                     }
+//                 };
+//             }
+
+//             // Thực hiện xóa các stages upcoming không có trong updates
+//             validStageIdsToDelete = stagesToDelete
+//                 .filter(stage => stage.status === "upcoming")
+//                 .map(stage => stage._id);
+
+//             if (validStageIdsToDelete.length > 0) {
+//                 await PlanStagesModel.deleteMany({
+//                     _id: { $in: validStageIdsToDelete }
+//                 });
+
+//                 console.log(`🗑️ Đã xóa ${validStageIdsToDelete.length} giai đoạn không có trong updates`);
+//             }
+
+//             // Phân loại stages theo trạng thái từ getCurrentStage (sau khi đã xóa)
+//             const remainingStagesWithProgress = allStagesWithProgress.filter(stage =>
+//                 !validStageIdsToDelete.includes(stage._id.toString())
+//             );
+
+//             const completedStages = remainingStagesWithProgress.filter(stage => stage.status === "completed");
+//             const currentStage = remainingStagesWithProgress.find(stage => stage.status === "in_progress");
+//             const upcomingStages = remainingStagesWithProgress.filter(stage => stage.status === "upcoming");
+
+//             // Validation: kiểm tra xem có cố gắng update stage đã hoàn thành không
+//             const invalidUpdates = [];
+//             const stagesToKeep = []; // Các stage đã hoàn thành sẽ được giữ nguyên
+//             const stagesToUpdate = []; // Các stage có thể cập nhật
+
+//             // Giữ nguyên tất cả stages đã hoàn thành
+//             completedStages.forEach(stage => {
+//                 stagesToKeep.push({
+//                     _id: stage._id,
+//                     title: stage.title,
+//                     description: stage.description,
+//                     orderNumber: stage.orderNumber,
+//                     daysToComplete: stage.daysToComplete,
+//                     reason: "Đã hoàn thành - không thể chỉnh sửa"
+//                 });
+//             });
+
+//             // Kiểm tra các stage trong updates
+//             updates.stages.forEach(updateStage => {
+//                 // THÊM MỚI: Validation cho từng stage
+//                 if (!updateStage.title || updateStage.title.trim() === "") {
+//                     invalidUpdates.push({
+//                         stageId: updateStage._id || "new",
+//                         title: updateStage.title || "Không có tiêu đề",
+//                         reason: "Tiêu đề giai đoạn không được để trống"
+//                     });
+//                     return;
+//                 }
+
+//                 if (!updateStage.description || updateStage.description.trim() === "") {
+//                     invalidUpdates.push({
+//                         stageId: updateStage._id || "new",
+//                         title: updateStage.title,
+//                         reason: "Mô tả giai đoạn không được để trống"
+//                     });
+//                     return;
+//                 }
+
+//                 if (!updateStage.daysToComplete || updateStage.daysToComplete <= 0) {
+//                     invalidUpdates.push({
+//                         stageId: updateStage._id || "new",
+//                         title: updateStage.title,
+//                         reason: "Số ngày hoàn thành phải lớn hơn 0"
+//                     });
+//                     return;
+//                 }
+
+//                 if (updateStage.daysToComplete > 365) {
+//                     invalidUpdates.push({
+//                         stageId: updateStage._id || "new",
+//                         title: updateStage.title,
+//                         reason: "Số ngày hoàn thành không được vượt quá 365 ngày"
+//                     });
+//                     return;
+//                 }
+
+//                 if (updateStage._id) {
+//                     // Update stage có sẵn
+//                     const existingStage = remainingStagesWithProgress.find(s => s._id.toString() === updateStage._id.toString());
+
+//                     if (existingStage) {
+//                         if (existingStage.status === "completed") {
+//                             // Stage đã hoàn thành - không được phép chỉnh sửa
+//                             invalidUpdates.push({
+//                                 stageId: updateStage._id,
+//                                 title: existingStage.title,
+//                                 reason: "Giai đoạn đã hoàn thành - không thể chỉnh sửa"
+//                             });
+//                         } else if (existingStage.status === "in_progress") {
+//                             // Stage đang thực hiện - chỉ cho phép sửa title và description
+//                             if (updateStage.daysToComplete && updateStage.daysToComplete !== existingStage.daysToComplete) {
+//                                 invalidUpdates.push({
+//                                     stageId: updateStage._id,
+//                                     title: existingStage.title,
+//                                     reason: "Giai đoạn đang thực hiện - không thể thay đổi số ngày hoàn thành"
+//                                 });
+//                             } else if (updateStage.orderNumber && updateStage.orderNumber !== existingStage.orderNumber) {
+//                                 invalidUpdates.push({
+//                                     stageId: updateStage._id,
+//                                     title: existingStage.title,
+//                                     reason: "Giai đoạn đang thực hiện - không thể thay đổi thứ tự"
+//                                 });
+//                             } else {
+//                                 // Cho phép cập nhật title và description cho stage đang thực hiện
+//                                 stagesToUpdate.push({
+//                                     _id: updateStage._id,
+//                                     title: updateStage.title || existingStage.title,
+//                                     description: updateStage.description || existingStage.description,
+//                                     orderNumber: existingStage.orderNumber, // Giữ nguyên
+//                                     daysToComplete: existingStage.daysToComplete, // Giữ nguyên
+//                                     updateType: "limited" // Chỉ cập nhật một phần
+//                                 });
+//                             }
+//                         } else {
+//                             // Stage upcoming - cho phép cập nhật tất cả
+//                             stagesToUpdate.push({
+//                                 _id: updateStage._id,
+//                                 title: updateStage.title,
+//                                 description: updateStage.description,
+//                                 orderNumber: updateStage.orderNumber,
+//                                 daysToComplete: updateStage.daysToComplete,
+//                                 updateType: "full" // Cập nhật đầy đủ
+//                             });
+//                         }
+//                     }
+//                 } else {
+//                     // Stage mới - chỉ cho phép thêm vào cuối (order lớn hơn stage cuối cùng)
+//                     const maxOrder = remainingStagesWithProgress.length > 0 ?
+//                         Math.max(...remainingStagesWithProgress.map(s => s.orderNumber)) : 0;
+
+//                     if (updateStage.orderNumber && updateStage.orderNumber <= maxOrder) {
+//                         // Chỉ cho phép thêm stage mới ở cuối
+//                         const lastCompletedOrder = completedStages.length > 0 ? Math.max(...completedStages.map(s => s.orderNumber)) : 0;
+//                         const currentOrder = currentStage ? currentStage.orderNumber : 0;
+
+//                         if (updateStage.orderNumber <= Math.max(lastCompletedOrder, currentOrder)) {
+//                             invalidUpdates.push({
+//                                 title: updateStage.title,
+//                                 reason: "Không thể thêm giai đoạn mới vào giữa các giai đoạn đã bắt đầu"
+//                             });
+//                         } else {
+//                             stagesToUpdate.push({
+//                                 title: updateStage.title,
+//                                 description: updateStage.description,
+//                                 orderNumber: updateStage.orderNumber,
+//                                 daysToComplete: updateStage.daysToComplete,
+//                                 updateType: "new"
+//                             });
+//                         }
+//                     } else {
+//                         // Tự động gán order number
+//                         stagesToUpdate.push({
+//                             title: updateStage.title,
+//                             description: updateStage.description,
+//                             orderNumber: maxOrder + 1,
+//                             daysToComplete: updateStage.daysToComplete,
+//                             updateType: "new"
+//                         });
+//                     }
+//                 }
+//             });
+
+//             // Nếu có lỗi validation, trả về lỗi
+//             if (invalidUpdates.length > 0) {
+//                 return {
+//                     success: false,
+//                     message: "Không thể cập nhật một số giai đoạn do vi phạm quy tắc chỉnh sửa",
+//                     data: {
+//                         invalidUpdates,
+//                         validationRules: {
+//                             completed: "Không được chỉnh sửa giai đoạn đã hoàn thành",
+//                             in_progress: "Giai đoạn đang thực hiện chỉ được chỉnh sửa tiêu đề và mô tả",
+//                             upcoming: "Giai đoạn chưa bắt đầu có thể chỉnh sửa tất cả thông tin",
+//                             new_stages: "Chỉ được thêm giai đoạn mới vào cuối",
+//                             basic_validation: "Tiêu đề, mô tả và số ngày hợp lệ là bắt buộc",
+//                             delete_validation: "Chỉ có thể xóa giai đoạn chưa bắt đầu"
+//                         },
+//                         currentStageInfo: stageInfo.data,
+//                         deletedStages: validStageIdsToDelete.length
+//                     }
+//                 };
+//             }
+
+//             // Thực hiện cập nhật stages
+//             if (stagesToUpdate.length > 0) {
+//                 // Xóa các stages có thể cập nhật (không xóa stages đã hoàn thành)
+//                 const stageIdsToDelete = stagesToUpdate
+//                     .filter(stage => stage._id && stage.updateType !== "new")
+//                     .map(stage => stage._id);
+
+//                 if (stageIdsToDelete.length > 0) {
+//                     await PlanStagesModel.deleteMany({
+//                         _id: { $in: stageIdsToDelete }
+//                     });
+//                 }
+
+//                 // Tạo lại các stages
+//                 const stagePromises = stagesToUpdate.map(stage => {
+//                     const newStage = new PlanStagesModel({
+//                         quitPlansId: planId,
+//                         title: stage.title,
+//                         description: stage.description,
+//                         orderNumber: stage.orderNumber,
+//                         daysToComplete: stage.daysToComplete
+//                     });
+//                     return newStage.save();
+//                 });
+
+//                 await Promise.all(stagePromises);
+
+//                 // Tự động tính toán lại expectedQuitDate dựa trên tổng thời gian stages
+//                 const allStagesAfterUpdate = await PlanStagesModel.find({ quitPlansId: planId })
+//                     .sort({ orderNumber: 1 });
+
+//                 const totalStageDays = allStagesAfterUpdate.reduce((sum, stage) => sum + stage.daysToComplete, 0);
+
+//                 // THÊM MỚI: Kiểm tra lại subscription limit sau khi cập nhật
+//                 const finalSubscriptionCheck = await checkSubscriptionLimit(userId, totalStageDays);
+//                 if (!finalSubscriptionCheck.isValid) {
+//                     // Rollback nếu vượt quá limit
+//                     await PlanStagesModel.deleteMany({ quitPlansId: planId });
+
+//                     // Khôi phục stages cũ (simplified - trong thực tế có thể cần backup trước)
+//                     return {
+//                         success: false,
+//                         message: `Cập nhật bị hủy: ${finalSubscriptionCheck.message}`,
+//                         data: {
+//                             remainingDays: finalSubscriptionCheck.remainingDays,
+//                             requiredDays: finalSubscriptionCheck.requiredDays,
+//                             excessDays: finalSubscriptionCheck.excessDays
+//                         }
+//                     };
+//                 }
+
+//                 const newExpectedQuitDate = new Date(plan.startDate);
+//                 newExpectedQuitDate.setDate(newExpectedQuitDate.getDate() + totalStageDays);
+
+//                 plan.expectedQuitDate = newExpectedQuitDate;
+//                 await plan.save();
+//             }
+//         }
+
+//         // Lấy kế hoạch đã cập nhật
+//         const updatedPlan = await QuitPlansModel.findById(planId)
+//             .populate("userId", "name email");
+//         const stages = await PlanStagesModel.find({ quitPlansId: planId })
+//             .sort({ orderNumber: 1 });
+
+//         // Sử dụng lại getCurrentStage để lấy thông tin trạng thái mới
+//         const updatedStageInfo = await getCurrentStage(userId);
+
+//         return {
+//             success: true,
+//             data: {
+//                 plan: updatedPlan,
+//                 stages: stages,
+//                 stageInfo: updatedStageInfo.success ? updatedStageInfo.data : null,
+//                 updateSummary: {
+//                     reasonUpdated: !!updates.reason,
+//                     stagesUpdated: !!(updates.stages && updates.stages.length > 0),
+//                     totalStages: stages.length,
+//                     expectedQuitDateAutoCalculated: !!(updates.stages && updates.stages.length > 0),
+//                     newExpectedQuitDate: updatedPlan.expectedQuitDate,
+//                     deletedStagesCount: updates.stages ? validStageIdsToDelete.length : 0 // THÊM MỚI
+//                 }
+//             },
+//             message: updates.stages && updates.stages.length > 0 ?
+//                 `Cập nhật kế hoạch thành công. ${validStageIdsToDelete.length > 0 ? `Đã xóa ${validStageIdsToDelete.length} giai đoạn. ` : ''}Ngày hoàn thành đã được tự động tính toán lại.` :
+//                 "Cập nhật kế hoạch thành công"
+//         };
+
+//     } catch (error) {
+//         throw new Error(`Lỗi khi cập nhật kế hoạch: ${error.message}`);
+//     }
+// };
+
 const updateQuitPlan = async (planId, userId, updates) => {
     try {
         const plan = await QuitPlansModel.findOne({
@@ -678,6 +1072,16 @@ const updateQuitPlan = async (planId, userId, updates) => {
         if (updates.reason) {
             plan.reason = updates.reason;
             await plan.save();
+        }
+
+        let validStageIdsToDelete = [];
+
+        // THÊM MỚI: Validation đảm bảo ít nhất 1 stage sau khi xóa
+        if (updates.stages && updates.stages.length === 0) {
+            return {
+                success: false,
+                message: "Kế hoạch phải có ít nhất 1 giai đoạn"
+            };
         }
 
         // Xử lý cập nhật stages (nếu có)
@@ -712,30 +1116,96 @@ const updateQuitPlan = async (planId, userId, updates) => {
 
             const { allStagesWithProgress, planInfo } = stageInfo.data;
 
-            // Phân loại stages theo trạng thái từ getCurrentStage
-            const completedStages = allStagesWithProgress.filter(stage => stage.status === "completed");
-            const currentStage = allStagesWithProgress.find(stage => stage.status === "in_progress");
-            const upcomingStages = allStagesWithProgress.filter(stage => stage.status === "upcoming");
+            // THÊM MỚI: Logic xóa implicit (stages không có trong updates.stages)
+            const currentStages = await PlanStagesModel.find({ quitPlansId: planId });
+            const stageIdsInUpdate = updates.stages
+                .filter(stage => stage._id) // Chỉ lấy stages có _id (update existing)
+                .map(stage => stage._id.toString());
+
+            // Tìm stages sẽ bị xóa (không có trong updates.stages)
+            const stagesToDelete = allStagesWithProgress.filter(stage =>
+                !stageIdsInUpdate.includes(stage._id.toString())
+            );
+
+            // Validation: Không được xóa stages đã hoàn thành hoặc đang thực hiện
+            const invalidDeletes = stagesToDelete.filter(stage =>
+                stage.status === "completed" || stage.status === "in_progress"
+            );
+
+            // THÊM MỚI: Kiểm tra không được xóa tất cả stages remaining
+            const remainingStagesAfterDelete = allStagesWithProgress.filter(stage =>
+                stageIdsInUpdate.includes(stage._id.toString()) ||
+                (stage.status === "completed" || stage.status === "in_progress")
+            );
+
+            if (remainingStagesAfterDelete.length === 0) {
+                return {
+                    success: false,
+                    message: "Không thể xóa hết tất cả giai đoạn. Kế hoạch phải có ít nhất 1 giai đoạn."
+                };
+            }
+
+            if (invalidDeletes.length > 0) {
+                return {
+                    success: false,
+                    message: "Không thể xóa giai đoạn đã hoàn thành hoặc đang thực hiện",
+                    data: {
+                        invalidDeletes: invalidDeletes.map(stage => ({
+                            stageId: stage._id,
+                            title: stage.title,
+                            status: stage.status,
+                            reason: `Không thể xóa giai đoạn ${stage.status === "completed" ? "đã hoàn thành" : "đang thực hiện"}`
+                        }))
+                    }
+                };
+            }
+
+            // Thực hiện xóa các stages upcoming không có trong updates
+            validStageIdsToDelete = stagesToDelete
+                .filter(stage => stage.status === "upcoming")
+                .map(stage => stage._id);
+
+            if (validStageIdsToDelete.length > 0) {
+                await PlanStagesModel.deleteMany({
+                    _id: { $in: validStageIdsToDelete }
+                });
+
+                console.log(`🗑️ Đã xóa ${validStageIdsToDelete.length} giai đoạn không có trong updates`);
+            }
+
+            // ✅ BƯỚC MỚI: Phân loại stages sau khi xóa để tái tổ chức orderNumber
+            const remainingStagesWithProgress = allStagesWithProgress.filter(stage =>
+                !validStageIdsToDelete.includes(stage._id.toString())
+            );
+
+            const completedStages = remainingStagesWithProgress.filter(stage => stage.status === "completed");
+            const currentStage = remainingStagesWithProgress.find(stage => stage.status === "in_progress");
+            const upcomingStages = remainingStagesWithProgress.filter(stage => stage.status === "upcoming");
 
             // Validation: kiểm tra xem có cố gắng update stage đã hoàn thành không
             const invalidUpdates = [];
-            const stagesToKeep = []; // Các stage đã hoàn thành sẽ được giữ nguyên
+            const stagesToKeep = []; // Các stage đã hoàn thành/đang thực hiện sẽ được giữ nguyên với order cũ
             const stagesToUpdate = []; // Các stage có thể cập nhật
 
-            // Giữ nguyên tất cả stages đã hoàn thành
-            completedStages.forEach(stage => {
+            // ✅ GIỮ NGUYÊN tất cả stages completed và in_progress với orderNumber hiện tại
+            [...completedStages, ...(currentStage ? [currentStage] : [])].forEach(stage => {
                 stagesToKeep.push({
                     _id: stage._id,
                     title: stage.title,
                     description: stage.description,
-                    orderNumber: stage.orderNumber,
+                    orderNumber: stage.orderNumber, // ✅ Giữ nguyên orderNumber
                     daysToComplete: stage.daysToComplete,
-                    reason: "Đã hoàn thành - không thể chỉnh sửa"
+                    status: stage.status,
+                    reason: stage.status === "completed" ? "Đã hoàn thành - không thể chỉnh sửa" : "Đang thực hiện - giữ nguyên vị trí"
                 });
             });
 
+            // ✅ XÁC ĐỊNH orderNumber CAO NHẤT của stages được bảo vệ
+            const protectedMaxOrder = stagesToKeep.length > 0 ?
+                Math.max(...stagesToKeep.map(s => s.orderNumber)) : 0;
+
             // Kiểm tra các stage trong updates
-            updates.stages.forEach(updateStage => {
+            updates.stages.forEach((updateStage, arrayIndex) => {
                 // THÊM MỚI: Validation cho từng stage
                 if (!updateStage.title || updateStage.title.trim() === "") {
                     invalidUpdates.push({
@@ -775,7 +1245,7 @@ const updateQuitPlan = async (planId, userId, updates) => {
 
                 if (updateStage._id) {
                     // Update stage có sẵn
-                    const existingStage = allStagesWithProgress.find(s => s._id.toString() === updateStage._id.toString());
+                    const existingStage = remainingStagesWithProgress.find(s => s._id.toString() === updateStage._id.toString());
 
                     if (existingStage) {
                         if (existingStage.status === "completed") {
@@ -793,69 +1263,60 @@ const updateQuitPlan = async (planId, userId, updates) => {
                                     title: existingStage.title,
                                     reason: "Giai đoạn đang thực hiện - không thể thay đổi số ngày hoàn thành"
                                 });
-                            } else if (updateStage.orderNumber && updateStage.orderNumber !== existingStage.orderNumber) {
-                                invalidUpdates.push({
-                                    stageId: updateStage._id,
-                                    title: existingStage.title,
-                                    reason: "Giai đoạn đang thực hiện - không thể thay đổi thứ tự"
-                                });
                             } else {
-                                // Cho phép cập nhật title và description cho stage đang thực hiện
+                                // ✅ Cho phép cập nhật title và description cho stage đang thực hiện
+                                // NHƯNG GIỮ NGUYÊN orderNumber
                                 stagesToUpdate.push({
                                     _id: updateStage._id,
                                     title: updateStage.title || existingStage.title,
                                     description: updateStage.description || existingStage.description,
-                                    orderNumber: existingStage.orderNumber, // Giữ nguyên
+                                    orderNumber: existingStage.orderNumber, // ✅ Giữ nguyên orderNumber
                                     daysToComplete: existingStage.daysToComplete, // Giữ nguyên
                                     updateType: "limited" // Chỉ cập nhật một phần
                                 });
                             }
                         } else {
-                            // Stage upcoming - cho phép cập nhật tất cả
+                            // ✅ Stage upcoming - TỰ ĐỘNG GÁN LẠI orderNumber dựa trên vị trí trong array
+                            // Tính orderNumber mới dựa trên vị trí trong danh sách stages được gửi lên
+                            const newOrderNumber = protectedMaxOrder + arrayIndex + 1;
+
                             stagesToUpdate.push({
                                 _id: updateStage._id,
                                 title: updateStage.title,
                                 description: updateStage.description,
-                                orderNumber: updateStage.orderNumber,
+                                orderNumber: newOrderNumber, // ✅ TỰ ĐỘNG gán order mới
                                 daysToComplete: updateStage.daysToComplete,
                                 updateType: "full" // Cập nhật đầy đủ
                             });
                         }
                     }
                 } else {
-                    // Stage mới - chỉ cho phép thêm vào cuối (order lớn hơn stage cuối cùng)
-                    const maxOrder = Math.max(...allStagesWithProgress.map(s => s.orderNumber));
-                    if (updateStage.orderNumber && updateStage.orderNumber <= maxOrder) {
-                        // Chỉ cho phép thêm stage mới ở cuối
-                        const lastCompletedOrder = completedStages.length > 0 ? Math.max(...completedStages.map(s => s.orderNumber)) : 0;
-                        const currentOrder = currentStage ? currentStage.orderNumber : 0;
+                    // ✅ Stage mới - TỰ ĐỘNG thêm vào cuối với orderNumber liên tiếp
+                    const newOrderNumber = protectedMaxOrder + arrayIndex + 1;
 
-                        if (updateStage.orderNumber <= Math.max(lastCompletedOrder, currentOrder)) {
-                            invalidUpdates.push({
-                                title: updateStage.title,
-                                reason: "Không thể thêm giai đoạn mới vào giữa các giai đoạn đã bắt đầu"
-                            });
-                        } else {
-                            stagesToUpdate.push({
-                                title: updateStage.title,
-                                description: updateStage.description,
-                                orderNumber: updateStage.orderNumber,
-                                daysToComplete: updateStage.daysToComplete,
-                                updateType: "new"
-                            });
-                        }
-                    } else {
-                        // Tự động gán order number
-                        stagesToUpdate.push({
-                            title: updateStage.title,
-                            description: updateStage.description,
-                            orderNumber: maxOrder + 1,
-                            daysToComplete: updateStage.daysToComplete,
-                            updateType: "new"
-                        });
-                    }
+                    stagesToUpdate.push({
+                        title: updateStage.title,
+                        description: updateStage.description,
+                        orderNumber: newOrderNumber, // ✅ TỰ ĐỘNG gán order
+                        daysToComplete: updateStage.daysToComplete,
+                        updateType: "new"
+                    });
                 }
             });
+
+            // ✅ TÁI SẮP XẾP orderNumber cho tất cả stages được update
+            // Sắp xếp lại để đảm bảo orderNumber liên tiếp
+            stagesToUpdate.sort((a, b) => a.orderNumber - b.orderNumber);
+
+            // Gán lại orderNumber liên tiếp bắt đầu từ sau stages được bảo vệ
+            stagesToUpdate.forEach((stage, index) => {
+                if (stage.updateType !== "limited") { // Không thay đổi order của stage in_progress
+                    stage.orderNumber = protectedMaxOrder + index + 1;
+                }
+            });
+
+            console.log(`🔧 Auto-reorder: Protected stages có order tối đa: ${protectedMaxOrder}`);
+            console.log(`📋 Stages sẽ update với order: ${stagesToUpdate.map(s => `${s.title}(${s.orderNumber})`).join(', ')}`);
 
             // Nếu có lỗi validation, trả về lỗi
             if (invalidUpdates.length > 0) {
@@ -868,10 +1329,13 @@ const updateQuitPlan = async (planId, userId, updates) => {
                             completed: "Không được chỉnh sửa giai đoạn đã hoàn thành",
                             in_progress: "Giai đoạn đang thực hiện chỉ được chỉnh sửa tiêu đề và mô tả",
                             upcoming: "Giai đoạn chưa bắt đầu có thể chỉnh sửa tất cả thông tin",
-                            new_stages: "Chỉ được thêm giai đoạn mới vào cuối",
-                            basic_validation: "Tiêu đề, mô tả và số ngày hợp lệ là bắt buộc"
+                            new_stages: "Giai đoạn mới sẽ được tự động thêm vào cuối danh sách",
+                            basic_validation: "Tiêu đề, mô tả và số ngày hợp lệ là bắt buộc",
+                            delete_validation: "Chỉ có thể xóa giai đoạn chưa bắt đầu",
+                            auto_reorder: "orderNumber sẽ được tự động sắp xếp lại sau khi thêm/xóa"
                         },
-                        currentStageInfo: stageInfo.data
+                        currentStageInfo: stageInfo.data,
+                        deletedStages: validStageIdsToDelete.length
                     }
                 };
             }
@@ -889,13 +1353,14 @@ const updateQuitPlan = async (planId, userId, updates) => {
                     });
                 }
 
-                // Tạo lại các stages
+                // ✅ Tạo lại các stages với orderNumber đã được tự động sắp xếp
                 const stagePromises = stagesToUpdate.map(stage => {
+                    console.log(`📝 Tạo stage: ${stage.title} với order: ${stage.orderNumber}`);
                     const newStage = new PlanStagesModel({
                         quitPlansId: planId,
                         title: stage.title,
                         description: stage.description,
-                        orderNumber: stage.orderNumber,
+                        orderNumber: stage.orderNumber, // ✅ orderNumber đã được auto-assign
                         daysToComplete: stage.daysToComplete
                     });
                     return newStage.save();
@@ -932,6 +1397,8 @@ const updateQuitPlan = async (planId, userId, updates) => {
 
                 plan.expectedQuitDate = newExpectedQuitDate;
                 await plan.save();
+
+                console.log(`✅ Cập nhật hoàn tất! Total stages: ${allStagesAfterUpdate.length}, Total days: ${totalStageDays}`);
             }
         }
 
@@ -955,11 +1422,13 @@ const updateQuitPlan = async (planId, userId, updates) => {
                     stagesUpdated: !!(updates.stages && updates.stages.length > 0),
                     totalStages: stages.length,
                     expectedQuitDateAutoCalculated: !!(updates.stages && updates.stages.length > 0),
-                    newExpectedQuitDate: updatedPlan.expectedQuitDate
+                    newExpectedQuitDate: updatedPlan.expectedQuitDate,
+                    deletedStagesCount: updates.stages ? validStageIdsToDelete.length : 0,
+                    autoReorderedStages: true // ✅ Đánh dấu đã tự động sắp xếp lại order
                 }
             },
             message: updates.stages && updates.stages.length > 0 ?
-                "Cập nhật kế hoạch thành công. Ngày hoàn thành đã được tự động tính toán lại." :
+                `Cập nhật kế hoạch thành công. ${validStageIdsToDelete.length > 0 ? `Đã xóa ${validStageIdsToDelete.length} giai đoạn. ` : ''}Thứ tự giai đoạn đã được tự động sắp xếp lại. Ngày hoàn thành đã được tự động tính toán lại.` :
                 "Cập nhật kế hoạch thành công"
         };
 
@@ -1295,7 +1764,7 @@ const getCurrentStage = async (userId) => {
 
         if (!currentPlan) {
             return {
-                success: false,
+                success: true,
                 message: "Không có kế hoạch cai thuốc nào đang thực hiện"
             };
         }

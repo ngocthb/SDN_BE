@@ -5,7 +5,11 @@ const {
     authUserMiddleware,
 } = require("../middleware/authMiddleware");
 
+const { checkSubscriptionExpiry } = require("../middleware/subscriptionMiddleware");
+
 routerSmokingStatus.use(authUserMiddleware);
+
+routerSmokingStatus.use(checkSubscriptionExpiry);
 
 routerSmokingStatus.post("/", SmokingStatusController.createOrUpdateSmokingStatus);
 
