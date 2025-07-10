@@ -1,5 +1,6 @@
 const SmokingStatusModel = require("../models/SmokingStatusModel");
 const UserModel = require("../models/UserModel");
+const QuitPlansModel = require("../models/QuitPlansModel");
 
 // Tạo hoặc cập nhật tình trạng hút thuốc
 const createOrUpdateSmokingStatus = async (userId, cigarettesPerDay, pricePerCigarette) => {
@@ -124,6 +125,23 @@ const deleteSmokingStatus = async (userId) => {
             return {
                 success: false,
                 message: "Không tìm thấy thông tin hút thuốc để xóa"
+            };
+        }
+
+        const activeQuitPlan = await QuitPlansModel.findOne({
+            userId: userId,
+            isActive: true
+        });
+
+        if (activeQuitPlan) {
+            return {
+                success: false,
+                message: "Không thể xóa thông tin hút thuốc vì bạn đang có kế hoạch cai thuốc đang thực hiện. Vui lòng hoàn thành hoặc hủy kế hoạch trước khi xóa thông tin hút thuốc.",
+                data: {
+                    hasActiveQuitPlan: true,
+                    quitPlanId: activeQuitPlan._id,
+                    suggestion: "Hãy hoàn thành kế hoạch cai thuốc hiện tại hoặc hủy kế hoạch nếu muốn xóa thông tin hút thuốc."
+                }
             };
         }
 
