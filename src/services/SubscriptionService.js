@@ -39,7 +39,7 @@ exports.validateSubscription = async (data) => {
   const existingActiveSubscription = await SubscriptionModel.findOne({
     userId: userId,
     status: "active",
-    endDate: { $gt: new Date() }
+    endDate: { $gt: new Date() },
   });
 
   if (existingActiveSubscription) {
@@ -113,12 +113,14 @@ exports.deleteSubscription = async (id) => {
   return deleted;
 };
 
-exports.extendSubscription = async (id, newEndDate) => {
+exports.extendSubscription = async (id) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw new Error("Invalid subscription ID.");
   }
 
-  const subscription = await SubscriptionModel.findById(id);
+  const subscription = await SubscriptionModel.findById(id).populate(
+    "membershipId"
+  );
   if (!subscription) {
     throw new Error("Subscription not found.");
   }
@@ -127,15 +129,20 @@ exports.extendSubscription = async (id, newEndDate) => {
     throw new Error("Cannot extend a cancelled subscription.");
   }
 
-  if (!newEndDate || isNaN(new Date(newEndDate))) {
-    throw new Error("Invalid newEndDate.");
+  const duration = subscription.membershipId?.duration;
+  if (!duration || isNaN(duration)) {
+    throw new Error("Invalid package duration.");
   }
 
-  if (new Date(newEndDate) <= new Date(subscription.endDate)) {
-    throw new Error("New end date must be after current end date.");
-  }
+  const currentEndDate = new Date(subscription.endDate);
+  const today = new Date();
 
-  subscription.endDate = newEndDate;
+  const baseDate = currentEndDate > today ? currentEndDate : today;
+  const extendedEndDate = new Date(
+    baseDate.getTime() + duration * 24 * 60 * 60 * 1000
+  );
+
+  subscription.endDate = extendedEndDate;
   await subscription.save();
 
   return subscription;
@@ -175,21 +182,24 @@ exports.getMySubscription = async (userId) => {
   const activeSubscription = await SubscriptionModel.findOne({
     userId: userId,
     status: "active",
-    endDate: { $gt: new Date() } // Chưa hết hạn
-  }).populate("userId", "name email")
+    endDate: { $gt: new Date() }, // Chưa hết hạn
+  })
+    .populate("userId", "name email")
     .populate("membershipId", "name price duration description");
 
   if (!activeSubscription) {
     return {
       hasActiveSubscription: false,
       subscription: null,
-      message: "Bạn chưa có gói đăng ký nào đang hoạt động"
+      message: "Bạn chưa có gói đăng ký nào đang hoạt động",
     };
   }
 
   // Tính số ngày còn lại
   const now = new Date();
-  const daysRemaining = Math.ceil((activeSubscription.endDate - now) / (1000 * 60 * 60 * 24));
+  const daysRemaining = Math.ceil(
+    (activeSubscription.endDate - now) / (1000 * 60 * 60 * 24)
+  );
 
   return {
     hasActiveSubscription: true,
@@ -197,11 +207,12 @@ exports.getMySubscription = async (userId) => {
       ...activeSubscription.toObject(),
       daysRemaining: daysRemaining,
       isExpiringSoon: daysRemaining <= 7, // Cảnh báo khi còn <= 7 ngày
-      status: daysRemaining <= 3 ? "expiring_soon" : "active"
+      status: daysRemaining <= 3 ? "expiring_soon" : "active",
     },
-    message: daysRemaining <= 3 ?
-      `Gói đăng ký sẽ hết hạn trong ${daysRemaining} ngày` :
-      `Gói đăng ký còn ${daysRemaining} ngày`
+    message:
+      daysRemaining <= 3
+        ? `Gói đăng ký sẽ hết hạn trong ${daysRemaining} ngày`
+        : `Gói đăng ký còn ${daysRemaining} ngày`,
   };
 };
 
@@ -218,7 +229,7 @@ exports.getMySubscriptionHistory = async (userId, page = 1, limit = 10) => {
   const skip = (page - 1) * limit;
 
   const subscriptions = await SubscriptionModel.find({
-    userId: userId
+    userId: userId,
   })
     .populate("membershipId", "name price duration description")
     .sort({ createdAt: -1 }) // Mới nhất trước
@@ -227,16 +238,20 @@ exports.getMySubscriptionHistory = async (userId, page = 1, limit = 10) => {
 
   const total = await SubscriptionModel.countDocuments({ userId: userId });
 
-  const subscriptionsWithStatus = subscriptions.map(sub => {
+  const subscriptionsWithStatus = subscriptions.map((sub) => {
     const now = new Date();
     const isExpired = sub.endDate < now;
-    const daysRemaining = isExpired ? 0 : Math.ceil((sub.endDate - now) / (1000 * 60 * 60 * 24));
+    const daysRemaining = isExpired
+      ? 0
+      : Math.ceil((sub.endDate - now) / (1000 * 60 * 60 * 24));
 
     return {
       ...sub.toObject(),
       daysRemaining: daysRemaining,
       actualStatus: isExpired ? "expired" : sub.status,
-      duration: Math.ceil((sub.endDate - sub.startDate) / (1000 * 60 * 60 * 24))
+      duration: Math.ceil(
+        (sub.endDate - sub.startDate) / (1000 * 60 * 60 * 24)
+      ),
     };
   });
 
@@ -248,7 +263,7 @@ exports.getMySubscriptionHistory = async (userId, page = 1, limit = 10) => {
       totalItems: total,
       itemsPerPage: limit,
       hasNextPage: page < Math.ceil(total / limit),
-      hasPrevPage: page > 1
-    }
+      hasPrevPage: page > 1,
+    },
   };
 };

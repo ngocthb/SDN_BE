@@ -5,9 +5,11 @@ const {
     authUserMiddleware,
 } = require("../middleware/authMiddleware");
 
+const { checkSubscriptionExpiry } = require("../middleware/subscriptionMiddleware");
 // Tất cả routes đều cần authentication
 routerProgressLogs.use(authUserMiddleware);
 
+routerProgressLogs.use(checkSubscriptionExpiry);
 // Ghi nhận tiến trình hàng ngày
 routerProgressLogs.post("/", ProgressLogsController.logDailyProgress);
 

@@ -1,31 +1,40 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const { default: mongoose } = require("mongoose");
+
+const routes = require("./routes");
+const http = require("http");
+const socketIo = require("socket.io");
+
 dotenv.config();
 const cors = require("cors");
 const bodyParser = require("body-parser");
 
-const routes = require("./routes");
-
-const { startDailyReminderCron, startDailySummaryCron, startTestReminderCron, startAutoCompleteCron, startSubscriptionExpirationCron, startSubscriptionMaintenanceCron } = require("./services/CronService");
+const {
+  startDailyReminderCron,
+  startDailySummaryCron,
+  startTestReminderCron,
+  startAutoCompleteCron,
+  startSubscriptionExpirationCron,
+  startSubscriptionMaintenanceCron,
+} = require("./services/CronService");
 
 const setupSocket = require("./config/socket");
-
-const http = require("http");
-
 
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
+
 const port = process.env.PORT;
 
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-startDailyReminderCron();    // Gửi email lúc 17:00
+startDailyReminderCron(); // Gửi email lúc 17:00
 // startTestReminderCron();
-startDailySummaryCron();     // Báo cáo lúc 17:30
+startDailySummaryCron(); // Báo cáo lúc 17:30
 
 startAutoCompleteCron(); // Tự động hoàn thành kế hoạch hết hạn lúc 8:00 sáng
 
@@ -35,10 +44,17 @@ startSubscriptionMaintenanceCron(); // Cập nhật subscription hết hạn lú
 
 routes(app);
 
-// Tạo server HTTP
-const server = http.createServer(app);
+const io = socketIo(server, {
+  pingTimeout: 60000, // Giữ kết nối lâu hơn
+  cors: {
+    origin: ["http://localhost:3000", "http://localhost:5173"], // Đa frontend
+    credentials: true, // Cho phép gửi cookie/auth header
+    methods: ["GET", "POST"],
+  },
+});
 
 // Kết nối MongoDB
+
 mongoose
   .connect(process.env.MONGO_URL)
   .then(() => {
@@ -48,14 +64,6 @@ mongoose
   .catch((error) => {
     console.error("❌ MongoDB connection error:", error);
   });
-
-const io = require("socket.io")(server, {
-  pingTimeout: 60000,
-  cors: {
-    origin: "http://localhost:3000",
-    credentials: true, // ✅ BẮT BUỘC phải có dòng này
-  },
-});
 
 setupSocket(io);
 

@@ -165,15 +165,23 @@ const getTodayProgress = async (req, res) => {
     try {
         const userId = req.user.id;
 
-        const today = new Date().toISOString().split('T')[0];
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowString = tomorrow.toISOString().split('T')[0];
+        // ✅ FIX: Sử dụng cùng logic với chart
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
+
+        console.log('Today range:', {
+            today: today.toISOString(),
+            tomorrow: tomorrow.toISOString(),
+            localToday: today.toLocaleDateString('vi-VN')
+        });
 
         const result = await ProgressLogsService.getProgressLogs(
             userId,
             today,
-            tomorrowString,
+            tomorrow,
             1
         );
 

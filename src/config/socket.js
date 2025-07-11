@@ -4,9 +4,6 @@ const User = require("../models/UserModel");
 
 function setupSocket(io) {
   io.on("connection", (socket) => {
-    console.log("✅ Socket connected:", socket.id);
-    console.log("Socket ID:", socket.id);
-
     // 1️⃣ Client yêu cầu join room
     socket.on("join_room", async (userId) => {
       try {
@@ -15,7 +12,6 @@ function setupSocket(io) {
           chat = await Chat.create({ userId });
         }
         socket.join(chat._id.toString());
-        console.log(` joined room: ${chat._id}`);
       } catch (err) {
         console.error("Join room error:", err);
       }
@@ -98,7 +94,6 @@ function setupSocket(io) {
     });
 
     socket.on("typing", ({ chatId, userName }) => {
-      console.log(`User ${userName} is typing in chat ${chatId}`);
       socket.to(chatId).emit("typing", { userName, chatId });
     });
 

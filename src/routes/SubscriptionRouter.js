@@ -9,7 +9,7 @@ routerSubscription.post("/", subscriptionController.createSubscription);
 
 routerSubscription.get("/", subscriptionController.getAllSubscriptions);
 
-routerSubscription.get("/:id", subscriptionController.getSubscriptionById);
+// routerSubscription.get("/:id", subscriptionController.getSubscriptionById);
 
 routerSubscription.put("/:id", subscriptionController.updateSubscription);
 
