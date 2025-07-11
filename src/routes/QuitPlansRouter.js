@@ -5,7 +5,11 @@ const {
     authUserMiddleware,
 } = require("../middleware/authMiddleware");
 
+const { checkSubscriptionExpiry } = require("../middleware/subscriptionMiddleware");
+
 routerQuitPlans.use(authUserMiddleware);
+
+routerQuitPlans.use(checkSubscriptionExpiry);
 
 routerQuitPlans.get("/suggestions", QuitPlansController.getSuggestedPlan);
 

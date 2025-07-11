@@ -91,16 +91,39 @@ const updateQuitPlan = async (req, res) => {
             });
         }
 
+        // Validation cơ bản cho stages
         if (updates.stages && updates.stages.length > 0) {
             for (let i = 0; i < updates.stages.length; i++) {
                 const stage = updates.stages[i];
-                if (!stage.title || !stage.description || !stage.daysToComplete || stage.daysToComplete <= 0) {
+
+                // Validation bắt buộc
+                if (!stage.title || stage.title.trim() === "") {
                     return res.status(400).json({
                         success: false,
-                        message: `Giai đoạn ${i + 1}: title, description và daysToComplete (> 0) là bắt buộc`
+                        message: `Giai đoạn ${i + 1}: Tiêu đề không được để trống`
                     });
                 }
-                stage.orderNumber = i + 1;
+
+                if (!stage.description || stage.description.trim() === "") {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Giai đoạn ${i + 1}: Mô tả không được để trống`
+                    });
+                }
+
+                if (!stage.daysToComplete || stage.daysToComplete <= 0) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Giai đoạn ${i + 1}: Số ngày hoàn thành phải lớn hơn 0`
+                    });
+                }
+
+                if (stage.daysToComplete > 365) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Giai đoạn ${i + 1}: Số ngày hoàn thành không được vượt quá 365 ngày`
+                    });
+                }
             }
         }
 
