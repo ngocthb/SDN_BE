@@ -160,8 +160,10 @@ const getProgressStatistics = async (userId) => {
         }
 
         // Lấy tất cả logs
-        const allLogs = await ProgressLogsModel.find({ userId: userId })
-            .sort({ date: 1 });
+        const allLogs = await ProgressLogsModel.find({
+            userId: userId,
+            quitPlanId: currentPlan._id
+        }).sort({ date: 1 });
 
         if (allLogs.length === 0) {
             return {
@@ -389,6 +391,18 @@ const getHealthImprovements = (daysWithoutSmoking) => {
 // Lấy biểu đồ tiến trình
 const getProgressChart = async (userId, days = 30) => {
     try {
+        // Lấy thông tin kế hoạch hiện tại
+        const currentPlan = await QuitPlansModel.findOne({
+            userId: userId,
+            isActive: true
+        });
+
+        if (!currentPlan) {
+            return {
+                success: false,
+                message: "Bạn cần có kế hoạch cai thuốc đang thực hiện để thống kê tiến trình. Vui lòng tạo kế hoạch cai thuốc trước."
+            };
+        }
         // ✅ FIX: Tạo date range chính xác với local timezone
         const endDate = new Date();
         endDate.setHours(23, 59, 59, 999); // Cuối ngày hôm nay
@@ -408,7 +422,8 @@ const getProgressChart = async (userId, days = 30) => {
             date: {
                 $gte: startDate,
                 $lte: endDate
-            }
+            },
+            quitPlanId: currentPlan._id
         }).sort({ date: 1 });
 
         console.log('Found logs:', logs.map(log => ({
