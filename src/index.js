@@ -20,6 +20,7 @@ const {
 } = require("./services/CronService");
 
 const setupSocket = require("./config/socket");
+const path = require("path");
 
 dotenv.config();
 
@@ -65,6 +66,7 @@ mongoose
     console.error("❌ MongoDB connection error:", error);
   });
 
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 setupSocket(io);
 
 // Bắt đầu server

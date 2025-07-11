@@ -32,22 +32,43 @@ exports.createBlog = async (dataRequest) => {
     throw new Error("Author does not exist");
   }
 
-  if (imageUrl && imageUrl.trim()) {
-    const imageRegex = /(http(s?):)([/|.|\w|\s|-])*\.(?:jpg|jpeg|png|gif|svg)/i;
-    if (!imageRegex.test(imageUrl.trim())) {
-      throw new Error(
-        "Image URL must be a valid image link (.jpg, .png, .gif, .svg)"
-      );
-    }
-  }
+  // KHÔNG CẦN VALIDATE IMAGEURL NỮA vì multer đã xử lý
 
   // Tạo blog
   const newBlog = await BlogModel.create({
     title: title.trim(),
     content: content.trim(),
     authorId: authorId.trim(),
-    imageUrl: imageUrl?.trim() || null,
+    imageUrl: imageUrl || null, // imageUrl bây giờ là đường dẫn file trên server
   });
 
   return newBlog;
+};
+
+exports.getAllBlogs = async ({ skip = 0, limit = 5 }) => {
+  const blogs = await BlogModel.find()
+    .sort({ createdAt: -1 }) // mới nhất trước
+    .skip(skip)
+    .limit(limit)
+    .populate({
+      path: "authorId",
+      select: "name picture", // optional: lấy tên và ảnh người viết
+    })
+    .lean();
+
+  return blogs;
+};
+
+exports.deleteBlog = async (blogId) => {
+  if (!mongoose.Types.ObjectId.isValid(blogId)) {
+    throw new Error("Invalid blog ID");
+  }
+
+  const deleted = await BlogModel.findByIdAndDelete(blogId);
+
+  if (!deleted) {
+    throw new Error("Blog not found or already deleted");
+  }
+
+  return { message: "Blog deleted successfully" };
 };

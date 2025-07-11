@@ -44,13 +44,11 @@ exports.updateAchievement = async (req, res) => {
       req.params.id,
       req.body
     );
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Achievement updated successfully.",
-        data: updated,
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Achievement updated successfully.",
+      data: updated,
+    });
   } catch (error) {
     console.error("Error updating achievement:", error);
     return res.status(400).json({ success: false, message: error.message });
@@ -83,5 +81,28 @@ exports.getLeaderboard = async (req, res) => {
       success: false,
       message: error.message,
     });
+  }
+};
+
+// achievement.controller.js
+exports.getMyAchievements = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    if (!userId) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized. User not found." });
+    }
+
+    const achievements = await achievementService.getMyAchievements(userId);
+
+    return res.status(200).json({
+      success: true,
+      data: achievements,
+    });
+  } catch (error) {
+    console.error("Error fetching user's achievements:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
