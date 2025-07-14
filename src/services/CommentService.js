@@ -39,3 +39,27 @@ exports.createComment = async (data) => {
 
   return newComment;
 };
+
+exports.getCommentsByBlogId = async (blogId) => {
+  if (!mongoose.Types.ObjectId.isValid(blogId)) {
+    throw new Error("Invalid blogId.");
+  }
+
+  return await CommentModel.find({ blogId })
+    .populate("authorId", "name email") // Lấy tên và email người viết
+    .sort({ createdAt: -1 }); // Mới nhất trước
+};
+
+exports.deleteComment = async (commentId) => {
+  if (!mongoose.Types.ObjectId.isValid(commentId)) {
+    throw new Error("Invalid comment ID");
+  }
+
+  const deleted = await CommentModel.findByIdAndDelete(commentId);
+
+  if (!deleted) {
+    throw new Error("Comment not found or already deleted");
+  }
+
+  return { message: "Comment deleted successfully" };
+};

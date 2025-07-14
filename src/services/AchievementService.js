@@ -179,9 +179,23 @@ exports.getTopUsersByAchievements = async (limit = 5) => {
   });
 
   // Sắp xếp theo tổng điểm giảm dần và lấy top N
-  const sortedUsers = usersWithPoints
-    .sort((a, b) => b.totalPoints - a.totalPoints)
-    .slice(0, limit);
+ const sortedUsers = usersWithPoints
+  .filter((u) => u.totalPoints > 0)
+  .sort((a, b) => b.totalPoints - a.totalPoints)
+  .slice(0, limit);
 
   return sortedUsers;
 };
+
+exports.getMyAchievements = async (userId) => {
+  const user = await UserModel.findById(userId)
+    .populate("grantedAchievements")
+    .select("grantedAchievements");
+
+  if (!user) {
+    throw new Error("User not found.");
+  }
+
+  return user.grantedAchievements;
+};
+
