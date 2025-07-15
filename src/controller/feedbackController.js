@@ -130,7 +130,6 @@ const feedbackController = {
 
       res.json({
         status: "OK",
-        message: "Cập nhật phản hồi thành công",
         data: result.data,
       });
     } catch (error) {
