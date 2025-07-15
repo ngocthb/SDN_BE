@@ -1,18 +1,29 @@
-// services/RatingService.js
+// services/RatingService.js - FIXED getAllRatings method
 const Rating = require("../models/Rating");
 const User = require("../models/UserModel");
+const Subscription = require("../models/SubscriptionsModel");
 
 const RatingService = {
-  // Tạo rating mới
+  // Helper function để lấy subscription hiện tại của user
+  getCurrentSubscription: async (userId) => {
+    const currentDate = new Date();
+
+    const activeSubscription = await Subscription.findOne({
+      userId: userId,
+      status: "active",
+      startDate: { $lte: currentDate },
+      endDate: { $gte: currentDate },
+    })
+      .populate("membershipId", "name type price features")
+      .sort({ endDate: -1 }); // Lấy subscription expire muộn nhất nếu có nhiều
+
+    return activeSubscription;
+  },
+
+  // Tạo rating mới (Updated với subscription support)
   createRating: async (userId, ratingData) => {
     try {
-      const {
-        rating,
-        comment,
-        aspectRated,
-        membershipPackage,
-        wouldRecommend,
-      } = ratingData;
+      const { rating, comment, aspectRated, wouldRecommend } = ratingData;
 
       // Check xem user đã rating trong vòng 30 ngày chưa
       const hasRecent = await Rating.hasRecentRating(userId);
@@ -37,19 +48,37 @@ const RatingService = {
         (new Date() - new Date(user.createdAt)) / (1000 * 60 * 60 * 24)
       );
 
-      // Tạo rating mới
+      // Lấy subscription hiện tại của user
+      const currentSubscription = await RatingService.getCurrentSubscription(
+        userId
+      );
+
+      // Tạo rating mới với subscription reference
       const newRating = new Rating({
         user: userId,
         rating,
         comment: comment || "",
         aspectRated: aspectRated || "overall",
-        membershipPackage,
+        subscription: currentSubscription?._id || null, // Reference đến subscription hoặc null cho free user
+        // Giữ lại membershipPackage để backward compatibility
+        membershipPackage: currentSubscription?.membershipId?.type || "free",
         daysUsed,
         wouldRecommend: wouldRecommend !== false, // default true
       });
 
       await newRating.save();
-      await newRating.populate("user", "name email picture");
+
+      // Populate user và subscription information
+      await newRating.populate([
+        { path: "user", select: "name email picture" },
+        {
+          path: "subscription",
+          populate: {
+            path: "membershipId",
+            select: "name type price features",
+          },
+        },
+      ]);
 
       return newRating;
     } catch (error) {
@@ -57,10 +86,17 @@ const RatingService = {
     }
   },
 
-  // Lấy ratings của user
+  // Lấy ratings của user (Updated với subscription info)
   getUserRatings: async (userId, page = 1, limit = 10) => {
     try {
       const ratings = await Rating.find({ user: userId })
+        .populate({
+          path: "subscription",
+          populate: {
+            path: "membershipId",
+            select: "name type price features",
+          },
+        })
         .sort({ createdAt: -1 })
         .limit(limit * 1)
         .skip((page - 1) * limit);
@@ -80,13 +116,18 @@ const RatingService = {
     }
   },
 
-  // Lấy rating theo ID
+  // Lấy rating theo ID (Updated với subscription info)
   getRatingById: async (ratingId) => {
     try {
-      const rating = await Rating.findById(ratingId).populate(
-        "user",
-        "name email picture"
-      );
+      const rating = await Rating.findById(ratingId)
+        .populate("user", "name email picture")
+        .populate({
+          path: "subscription",
+          populate: {
+            path: "membershipId",
+            select: "name type price features",
+          },
+        });
 
       if (!rating) {
         throw new Error("Không tìm thấy đánh giá");
@@ -98,7 +139,7 @@ const RatingService = {
     }
   },
 
-  // Cập nhật rating
+  // Cập nhật rating (Updated với subscription info)
   updateRating: async (ratingId, userId, updateData) => {
     try {
       const { rating, comment, aspectRated, wouldRecommend } = updateData;
@@ -134,7 +175,16 @@ const RatingService = {
         existingRating.wouldRecommend = wouldRecommend;
 
       await existingRating.save();
-      await existingRating.populate("user", "name email picture");
+      await existingRating.populate([
+        { path: "user", select: "name email picture" },
+        {
+          path: "subscription",
+          populate: {
+            path: "membershipId",
+            select: "name type price features",
+          },
+        },
+      ]);
 
       return existingRating;
     } catch (error) {
@@ -163,22 +213,47 @@ const RatingService = {
     }
   },
 
-  // Kiểm tra user có thể rating không
+  // Kiểm tra user có thể rating không + thông tin subscription
   canUserRate: async (userId) => {
     try {
       const hasRecent = await Rating.hasRecentRating(userId);
-      return !hasRecent;
+      const currentSubscription = await RatingService.getCurrentSubscription(
+        userId
+      );
+
+      return {
+        canRate: !hasRecent,
+        hasRecentRating: hasRecent,
+        currentSubscription: currentSubscription
+          ? {
+              id: currentSubscription._id,
+              status: currentSubscription.status,
+              startDate: currentSubscription.startDate,
+              endDate: currentSubscription.endDate,
+              membershipId: currentSubscription.membershipId,
+            }
+          : null,
+        membershipType: currentSubscription?.membershipId?.type || "free",
+        membershipName: currentSubscription?.membershipId?.name || "Free",
+      };
     } catch (error) {
       throw new Error(error.message);
     }
   },
 
-  // Lấy rating gần nhất của user
+  // Lấy rating gần nhất của user (Updated với subscription info)
   getUserLatestRating: async (userId) => {
     try {
       const rating = await Rating.findOne({ user: userId })
         .sort({ createdAt: -1 })
-        .populate("user", "name email picture");
+        .populate("user", "name email picture")
+        .populate({
+          path: "subscription",
+          populate: {
+            path: "membershipId",
+            select: "name type price features",
+          },
+        });
 
       return rating;
     } catch (error) {
@@ -186,14 +261,105 @@ const RatingService = {
     }
   },
 
-  // Thống kê platform rating
+  // Enhanced getPlatformStats với real membership names
   getPlatformStats: async (filters = {}) => {
     try {
-      const { aspectRated, membershipPackage, dateFrom, dateTo } = filters;
+      const {
+        aspectRated,
+        membershipType,
+        membershipPackage,
+        dateFrom,
+        dateTo,
+      } = filters;
 
-      // Build query
+      // Build aggregation pipeline
+      const pipeline = [];
+
+      // Stage 1: Lookup subscription và membership info
+      pipeline.push(
+        {
+          $lookup: {
+            from: "subscriptions",
+            localField: "subscription",
+            foreignField: "_id",
+            as: "subscriptionInfo",
+          },
+        },
+        {
+          $lookup: {
+            from: "memberships",
+            localField: "subscriptionInfo.membershipId",
+            foreignField: "_id",
+            as: "membershipInfo",
+          },
+        }
+      );
+
+      // Stage 2: Add computed fields with ENHANCED LOGIC
+      pipeline.push({
+        $addFields: {
+          // Enhanced membership classification
+          membershipCategory: {
+            $cond: {
+              if: {
+                $and: [
+                  { $gt: [{ $size: "$subscriptionInfo" }, 0] },
+                  {
+                    $eq: [
+                      { $arrayElemAt: ["$subscriptionInfo.status", 0] },
+                      "active",
+                    ],
+                  },
+                  { $gt: [{ $size: "$membershipInfo" }, 0] },
+                ],
+              },
+              then: {
+                $ifNull: [
+                  { $arrayElemAt: ["$membershipInfo.name", 0] }, // Use real membership name
+                  "Premium Subscription",
+                ],
+              },
+              else: {
+                $cond: {
+                  if: { $ne: ["$membershipPackage", "free"] },
+                  then: {
+                    $switch: {
+                      branches: [
+                        {
+                          case: { $eq: ["$membershipPackage", "basic"] },
+                          then: "Basic Plan",
+                        },
+                        {
+                          case: { $eq: ["$membershipPackage", "premium"] },
+                          then: "Premium Plan",
+                        },
+                        {
+                          case: { $eq: ["$membershipPackage", "vip"] },
+                          then: "VIP Plan",
+                        },
+                      ],
+                      default: "$membershipPackage",
+                    },
+                  },
+                  else: "Free Users",
+                },
+              },
+            },
+          },
+          // Keep original membershipType for filtering
+          membershipType: {
+            $ifNull: [
+              { $arrayElemAt: ["$membershipInfo.type", 0] },
+              { $ifNull: ["$membershipPackage", "free"] },
+            ],
+          },
+        },
+      });
+
+      // Stage 3: Match query
       const matchQuery = {};
       if (aspectRated) matchQuery.aspectRated = aspectRated;
+      if (membershipType) matchQuery.membershipType = membershipType;
       if (membershipPackage) matchQuery.membershipPackage = membershipPackage;
       if (dateFrom || dateTo) {
         matchQuery.createdAt = {};
@@ -201,26 +367,37 @@ const RatingService = {
         if (dateTo) matchQuery.createdAt.$lte = new Date(dateTo);
       }
 
-      const stats = await Rating.aggregate([
-        { $match: matchQuery },
-        {
-          $group: {
-            _id: null,
-            averageRating: { $avg: "$rating" },
-            totalRatings: { $sum: 1 },
-            wouldRecommendCount: {
-              $sum: { $cond: ["$wouldRecommend", 1, 0] },
+      if (Object.keys(matchQuery).length > 0) {
+        pipeline.push({ $match: matchQuery });
+      }
+
+      // Stage 4: Group và tính toán
+      pipeline.push({
+        $group: {
+          _id: null,
+          averageRating: { $avg: "$rating" },
+          totalRatings: { $sum: 1 },
+          wouldRecommendCount: {
+            $sum: { $cond: ["$wouldRecommend", 1, 0] },
+          },
+          distribution: { $push: "$rating" },
+          aspectBreakdown: {
+            $push: {
+              aspect: "$aspectRated",
+              rating: "$rating",
             },
-            distribution: { $push: "$rating" },
-            aspectBreakdown: {
-              $push: {
-                aspect: "$aspectRated",
-                rating: "$rating",
-              },
+          },
+          membershipBreakdown: {
+            $push: {
+              membershipCategory: "$membershipCategory", // Use real names for display
+              membershipType: "$membershipType", // Keep for compatibility
+              rating: "$rating",
             },
           },
         },
-      ]);
+      });
+
+      const stats = await Rating.aggregate(pipeline);
 
       if (stats.length === 0) {
         return {
@@ -229,6 +406,7 @@ const RatingService = {
           recommendationRate: 0,
           distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
           aspectAverages: {},
+          membershipAverages: {},
         };
       }
 
@@ -260,6 +438,29 @@ const RatingService = {
         };
       });
 
+      // ENHANCED: Tính average rating theo membership category (real names)
+      const membershipAverages = {};
+      const membershipGroups = {};
+
+      stats[0].membershipBreakdown.forEach((item) => {
+        const key = item.membershipCategory; // Use real names instead of types
+        if (!membershipGroups[key]) {
+          membershipGroups[key] = [];
+        }
+        membershipGroups[key].push(item.rating);
+      });
+
+      Object.keys(membershipGroups).forEach((membershipName) => {
+        const ratings = membershipGroups[membershipName];
+        membershipAverages[membershipName] = {
+          average:
+            Math.round(
+              (ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10
+            ) / 10,
+          count: ratings.length,
+        };
+      });
+
       const recommendationRate = Math.round(
         (stats[0].wouldRecommendCount / stats[0].totalRatings) * 100
       );
@@ -270,17 +471,25 @@ const RatingService = {
         recommendationRate: recommendationRate + "%",
         distribution,
         aspectAverages,
+        membershipAverages, // Now contains real names: {"Gói 1 năm": {...}, "Free Users": {...}}
       };
     } catch (error) {
       throw new Error(error.message);
     }
   },
 
-  // Lấy ratings gần đây (cho admin)
+  // Lấy ratings gần đây (cho admin) (Updated với subscription info)
   getRecentRatings: async (limit = 10) => {
     try {
       const ratings = await Rating.find()
         .populate("user", "name email picture")
+        .populate({
+          path: "subscription",
+          populate: {
+            path: "membershipId",
+            select: "name type price",
+          },
+        })
         .sort({ createdAt: -1 })
         .limit(limit * 1);
 
@@ -290,88 +499,280 @@ const RatingService = {
     }
   },
 
-  // Lấy tất cả ratings với filters và pagination
+  // ENHANCED getStatsByMembership with real membership names
+  getStatsByMembership: async () => {
+    try {
+      const stats = await Rating.aggregate([
+        {
+          $lookup: {
+            from: "subscriptions",
+            localField: "subscription",
+            foreignField: "_id",
+            as: "subscriptionInfo",
+          },
+        },
+        {
+          $lookup: {
+            from: "memberships",
+            localField: "subscriptionInfo.membershipId",
+            foreignField: "_id",
+            as: "membershipInfo",
+          },
+        },
+        {
+          $addFields: {
+            membershipType: {
+              $ifNull: [
+                { $arrayElemAt: ["$membershipInfo.type", 0] },
+                { $ifNull: ["$membershipPackage", "free"] },
+              ],
+            },
+            membershipName: {
+              $cond: {
+                if: {
+                  $and: [
+                    { $gt: [{ $size: "$subscriptionInfo" }, 0] },
+                    {
+                      $eq: [
+                        { $arrayElemAt: ["$subscriptionInfo.status", 0] },
+                        "active",
+                      ],
+                    },
+                    { $gt: [{ $size: "$membershipInfo" }, 0] },
+                  ],
+                },
+                then: {
+                  $ifNull: [
+                    { $arrayElemAt: ["$membershipInfo.name", 0] },
+                    "Premium Subscription",
+                  ],
+                },
+                else: {
+                  $switch: {
+                    branches: [
+                      {
+                        case: { $eq: ["$membershipPackage", "free"] },
+                        then: "Free Users",
+                      },
+                      {
+                        case: { $eq: ["$membershipPackage", "basic"] },
+                        then: "Basic Plan",
+                      },
+                      {
+                        case: { $eq: ["$membershipPackage", "premium"] },
+                        then: "Premium Plan",
+                      },
+                      {
+                        case: { $eq: ["$membershipPackage", "vip"] },
+                        then: "VIP Plan",
+                      },
+                    ],
+                    default: "Free Users",
+                  },
+                },
+              },
+            },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              type: "$membershipType",
+              name: "$membershipName",
+            },
+            avgRating: { $avg: "$rating" },
+            totalRatings: { $sum: 1 },
+            wouldRecommendCount: {
+              $sum: { $cond: ["$wouldRecommend", 1, 0] },
+            },
+          },
+        },
+        {
+          $project: {
+            membershipType: "$_id.type",
+            membershipName: "$_id.name",
+            avgRating: { $round: ["$avgRating", 2] },
+            totalRatings: 1,
+            wouldRecommendCount: 1,
+            recommendationRate: {
+              $round: [
+                {
+                  $multiply: [
+                    { $divide: ["$wouldRecommendCount", "$totalRatings"] },
+                    100,
+                  ],
+                },
+                2,
+              ],
+            },
+          },
+        },
+        {
+          $sort: { avgRating: -1 },
+        },
+      ]);
+
+      return stats;
+    } catch (error) {
+      throw new Error(`Error getting stats by membership: ${error.message}`);
+    }
+  },
+
+  // COMPLETELY REWRITTEN: Lấy tất cả ratings với filters và pagination
   getAllRatings: async (filters = {}, page = 1, limit = 10) => {
     try {
       const {
         aspectRated,
         rating,
         membershipPackage,
+        membershipType,
         dateFrom,
         dateTo,
         search,
       } = filters;
 
-      // Build query
-      const query = {};
-      if (aspectRated) query.aspectRated = aspectRated;
-      if (rating) query.rating = rating;
-      if (membershipPackage) query.membershipPackage = membershipPackage;
-      if (dateFrom || dateTo) {
-        query.createdAt = {};
-        if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
-        if (dateTo) query.createdAt.$lte = new Date(dateTo);
-      }
+      // Build aggregation pipeline
+      let pipeline = [];
 
-      let pipeline = [{ $match: query }];
+      // Stage 1: Lookup subscription và membership info
+      pipeline.push(
+        {
+          $lookup: {
+            from: "subscriptions",
+            localField: "subscription",
+            foreignField: "_id",
+            as: "subscriptionInfo",
+          },
+        },
+        {
+          $lookup: {
+            from: "memberships",
+            localField: "subscriptionInfo.membershipId",
+            foreignField: "_id",
+            as: "membershipInfo",
+          },
+        },
+        {
+          $lookup: {
+            from: "users",
+            localField: "user",
+            foreignField: "_id",
+            as: "userInfo",
+          },
+        }
+      );
 
-      // Add user lookup for search
+      // Stage 2: Add computed fields
       pipeline.push({
-        $lookup: {
-          from: "users",
-          localField: "user",
-          foreignField: "_id",
-          as: "userInfo",
+        $addFields: {
+          computedMembershipType: {
+            $ifNull: [
+              { $arrayElemAt: ["$membershipInfo.type", 0] },
+              { $ifNull: ["$membershipPackage", "free"] },
+            ],
+          },
+          computedMembershipName: {
+            $cond: {
+              if: {
+                $and: [
+                  { $gt: [{ $size: "$subscriptionInfo" }, 0] },
+                  {
+                    $eq: [
+                      { $arrayElemAt: ["$subscriptionInfo.status", 0] },
+                      "active",
+                    ],
+                  },
+                  { $gt: [{ $size: "$membershipInfo" }, 0] },
+                ],
+              },
+              then: {
+                $ifNull: [
+                  { $arrayElemAt: ["$membershipInfo.name", 0] },
+                  "Premium Subscription",
+                ],
+              },
+              else: {
+                $cond: {
+                  if: { $ne: ["$membershipPackage", "free"] },
+                  then: {
+                    $switch: {
+                      branches: [
+                        {
+                          case: { $eq: ["$membershipPackage", "basic"] },
+                          then: "Basic Plan",
+                        },
+                        {
+                          case: { $eq: ["$membershipPackage", "premium"] },
+                          then: "Premium Plan",
+                        },
+                        {
+                          case: { $eq: ["$membershipPackage", "vip"] },
+                          then: "VIP Plan",
+                        },
+                      ],
+                      default: "$membershipPackage",
+                    },
+                  },
+                  else: "Free Users",
+                },
+              },
+            },
+          },
         },
       });
 
-      // Search by user name or comment
+      // Stage 3: Build match conditions - SIMPLIFIED APPROACH
+      const matchConditions = {};
+
+      // Basic field filters - these work directly on the original document
+      if (aspectRated) matchConditions.aspectRated = aspectRated;
+      if (rating) matchConditions.rating = rating;
+      if (membershipPackage)
+        matchConditions.membershipPackage = membershipPackage;
+
+      // Date filters
+      if (dateFrom || dateTo) {
+        matchConditions.createdAt = {};
+        if (dateFrom) matchConditions.createdAt.$gte = new Date(dateFrom);
+        if (dateTo) matchConditions.createdAt.$lte = new Date(dateTo);
+      }
+
+      // Search condition (after lookup)
       if (search) {
+        matchConditions.$or = [
+          { "userInfo.name": { $regex: search, $options: "i" } },
+          { comment: { $regex: search, $options: "i" } },
+        ];
+      }
+
+      // Apply basic match conditions first
+      if (Object.keys(matchConditions).length > 0) {
+        pipeline.push({ $match: matchConditions });
+      }
+
+      // SEPARATE MEMBERSHIP TYPE FILTERING - handle after addFields
+      if (membershipType) {
         pipeline.push({
           $match: {
-            $or: [
-              { "userInfo.name": { $regex: search, $options: "i" } },
-              { comment: { $regex: search, $options: "i" } },
-            ],
+            computedMembershipName: membershipType,
           },
         });
       }
 
-      // Sort and paginate
+      // Get total count before pagination
+      const countPipeline = [...pipeline, { $count: "total" }];
+      const countResult = await Rating.aggregate(countPipeline);
+      const total = countResult.length > 0 ? countResult[0].total : 0;
+
+      // Add pagination and sorting
       pipeline.push(
         { $sort: { createdAt: -1 } },
         { $skip: (page - 1) * limit },
         { $limit: limit }
       );
 
+      // Execute final aggregation
       const ratings = await Rating.aggregate(pipeline);
-
-      // Get total count
-      let countPipeline = [{ $match: query }];
-      if (search) {
-        countPipeline.push(
-          {
-            $lookup: {
-              from: "users",
-              localField: "user",
-              foreignField: "_id",
-              as: "userInfo",
-            },
-          },
-          {
-            $match: {
-              $or: [
-                { "userInfo.name": { $regex: search, $options: "i" } },
-                { comment: { $regex: search, $options: "i" } },
-              ],
-            },
-          }
-        );
-      }
-      countPipeline.push({ $count: "total" });
-
-      const countResult = await Rating.aggregate(countPipeline);
-      const total = countResult.length > 0 ? countResult[0].total : 0;
 
       return {
         ratings,

@@ -28,14 +28,22 @@ exports.createOrderAndBuildPaymentUrl = async (data, ipAddress) => {
 
   const existingActiveSubscription = await SubscriptionModel.findOne({
     userId: userId,
-    status: "active"
+    status: "active",
   }).populate("membershipId", "name price duration");
 
   if (existingActiveSubscription) {
     const endDate = new Date(existingActiveSubscription.endDate);
-    const remainingDays = Math.ceil((endDate - new Date()) / (1000 * 60 * 60 * 24));
+    const remainingDays = Math.ceil(
+      (endDate - new Date()) / (1000 * 60 * 60 * 24)
+    );
 
-    throw new Error(`Bạn đã có gói đăng ký "${existingActiveSubscription.membershipId.name}" đang hoạt động. Gói này sẽ hết hạn vào ${endDate.toLocaleDateString('vi-VN')} (còn ${remainingDays} ngày). Vui lòng chờ gói hiện tại hết hạn hoặc hủy gói hiện tại trước khi đăng ký gói mới.`);
+    throw new Error(
+      `Bạn đã có gói đăng ký "${
+        existingActiveSubscription.membershipId.name
+      }" đang hoạt động. Gói này sẽ hết hạn vào ${endDate.toLocaleDateString(
+        "vi-VN"
+      )} (còn ${remainingDays} ngày). Vui lòng chờ gói hiện tại hết hạn hoặc hủy gói hiện tại trước khi đăng ký gói mới.`
+    );
   }
 
   const orderId = `${uuidv4()}_${membershipId}_${userId}`;
@@ -102,7 +110,10 @@ exports.confirmPayment = async (data) => {
 
   console.log("MembershipId:", membershipId);
   console.log("UserId:", userId);
-  console.log("Is valid membershipId:", mongoose.Types.ObjectId.isValid(membershipId));
+  console.log(
+    "Is valid membershipId:",
+    mongoose.Types.ObjectId.isValid(membershipId)
+  );
   console.log("Is valid userId:", mongoose.Types.ObjectId.isValid(userId));
 
   const newSubscription = await SubscriptionModel.create({

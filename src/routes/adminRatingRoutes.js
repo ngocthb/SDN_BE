@@ -16,6 +16,7 @@ router.delete("/:id", adminRatingController.deleteRating);
 
 // Dashboard & Analytics
 router.get("/dashboard", adminRatingController.getRatingDashboard);
+router.get("/stats", adminRatingController.getDetailedStats);
 router.get("/export", adminRatingController.exportRatings);
 
 module.exports = router;

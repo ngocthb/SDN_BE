@@ -30,7 +30,13 @@ const ratingSchema = new mongoose.Schema(
       type: String,
       maxlength: 500,
     },
-    // Có thể link với gói thành viên user đang dùng
+    // Reference đến subscription hiện tại của user khi rating
+    subscription: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "subscriptions",
+      default: null, // null cho free user
+    },
+    // Giữ lại field cũ để backward compatibility (optional)
     membershipPackage: {
       type: String,
       enum: ["free", "basic", "premium", "vip"],
@@ -66,6 +72,37 @@ ratingSchema.statics.hasRecentRating = async function (userId) {
 
   return !!recentRating;
 };
+
+// // Virtual để lấy membership type từ subscription
+// ratingSchema.virtual("membershipType").get(function () {
+//   if (!this.subscription || !this.subscription.membershipId) {
+//     return this.membershipPackage || "free";
+//   }
+//   return this.subscription.membershipId.type || "free";
+// });
+
+// // Virtual để lấy membership name
+// ratingSchema.virtual("membershipName").get(function () {
+//   if (!this.subscription || !this.subscription.membershipId) {
+//     return this.membershipPackage || "Free";
+//   }
+//   return this.subscription.membershipId.name || "Free";
+// });
+
+// Virtual để check subscription có active không
+ratingSchema.virtual("isSubscriptionActive").get(function () {
+  if (!this.subscription) return false;
+  const currentDate = new Date();
+  return (
+    this.subscription.status === "active" &&
+    this.subscription.startDate <= currentDate &&
+    this.subscription.endDate >= currentDate
+  );
+});
+
+// Ensure virtual fields are serialized
+ratingSchema.set("toJSON", { virtuals: true });
+ratingSchema.set("toObject", { virtuals: true });
 
 const RatingModel = mongoose.model("ratings", ratingSchema);
 module.exports = RatingModel;

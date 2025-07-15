@@ -1,56 +1,70 @@
 // controllers/admin/adminRatingController.js
 const Rating = require("../models/Rating");
+const RatingService = require("../services/RatingService");
 const mongoose = require("mongoose");
 
 const adminRatingController = {
-  // Lấy tất cả ratings với filter và pagination
+  // Lấy tất cả ratings với filter và pagination (Enhanced với subscription support)
   getAllRatings: async (req, res) => {
     try {
-      const {
+      let {
         page = 1,
         limit = 10,
         rating,
         aspectRated,
         membershipPackage,
+        membershipType,
         dateFrom,
         dateTo,
         sortBy = "createdAt",
         sortOrder = "desc",
+        search,
       } = req.query;
 
-      // Build query
-      const query = {};
-      if (rating) query.rating = Number(rating);
-      if (aspectRated) query.aspectRated = aspectRated;
-      if (membershipPackage) query.membershipPackage = membershipPackage;
-      if (dateFrom || dateTo) {
-        query.createdAt = {};
-        if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
-        if (dateTo) query.createdAt.$lte = new Date(dateTo);
+      if (rating) {
+        rating = parseInt(rating, 10);
       }
 
-      // Execute query với population
-      const ratings = await Rating.find(query)
-        .populate("user", "name email picture membershipPackage")
-        .sort({ [sortBy]: sortOrder === "desc" ? -1 : 1 })
-        .limit(limit * 1)
-        .skip((page - 1) * limit);
+      // Ép kiểu về số
+      page = Number(page) || 1;
+      limit = Number(limit) || 10;
 
-      const total = await Rating.countDocuments(query);
+      // Sử dụng RatingService method đã enhanced
+      const result = await RatingService.getAllRatings(
+        {
+          rating,
+          aspectRated,
+          membershipPackage,
+          membershipType,
+          dateFrom,
+          dateTo,
+          search,
+        },
+        page,
+        limit
+      );
+
+      // Post-process để ensure proper population
+      const enhancedRatings = await Rating.populate(result.ratings, [
+        { path: "user", select: "name email picture" },
+        {
+          path: "subscription",
+          populate: {
+            path: "membershipId",
+            select: "name type price",
+          },
+        },
+      ]);
 
       res.json({
         status: "OK",
         data: {
-          ratings,
-          pagination: {
-            total,
-            page: Number(page),
-            pages: Math.ceil(total / limit),
-            limit: Number(limit),
-          },
+          ratings: enhancedRatings,
+          pagination: result.pagination,
         },
       });
     } catch (error) {
+      console.error("Admin getAllRatings error:", error);
       res.status(500).json({
         status: "ERR",
         message: error.message,
@@ -64,32 +78,23 @@ const adminRatingController = {
       const { id } = req.params;
       const { reason } = req.body; // Lý do xóa
 
-      const rating = await Rating.findById(id);
-
-      if (!rating) {
-        return res.status(404).json({
-          status: "ERR",
-          message: "Không tìm thấy đánh giá",
-        });
-      }
+      const result = await RatingService.deleteRating(id, req.user.id, true); // isAdmin = true
 
       // Log việc xóa (có thể lưu vào collection khác)
       console.log(
         `Admin ${req.user.id} deleted rating ${id} for reason: ${reason}`
       );
 
-      await Rating.findByIdAndDelete(id);
-
       res.json({
         status: "OK",
-        message: "Xóa đánh giá thành công",
+        message: result.message,
         data: {
-          deletedRating: rating,
           deletedBy: req.user.id,
           reason: reason || "No reason provided",
         },
       });
     } catch (error) {
+      console.error("Admin deleteRating error:", error);
       res.status(500).json({
         status: "ERR",
         message: error.message,
@@ -97,7 +102,7 @@ const adminRatingController = {
     }
   },
 
-  // Lấy thống kê rating tổng quan cho dashboard
+  // Enhanced dashboard với subscription support
   getRatingDashboard: async (req, res) => {
     try {
       const { dateFrom, dateTo } = req.query;
@@ -110,9 +115,81 @@ const adminRatingController = {
         if (dateTo) dateFilter.createdAt.$lte = new Date(dateTo);
       }
 
+      // Enhanced aggregation pipeline với subscription lookup
+      const pipeline = [
+        { $match: dateFilter },
+        {
+          $lookup: {
+            from: "subscriptions",
+            localField: "subscription",
+            foreignField: "_id",
+            as: "subscriptionInfo",
+          },
+        },
+        {
+          $lookup: {
+            from: "memberships",
+            localField: "subscriptionInfo.membershipId",
+            foreignField: "_id",
+            as: "membershipInfo",
+          },
+        },
+        {
+          $addFields: {
+            membershipCategory: {
+              $cond: {
+                if: {
+                  $and: [
+                    { $gt: [{ $size: "$subscriptionInfo" }, 0] },
+                    {
+                      $eq: [
+                        { $arrayElemAt: ["$subscriptionInfo.status", 0] },
+                        "active",
+                      ],
+                    },
+                    { $gt: [{ $size: "$membershipInfo" }, 0] },
+                  ],
+                },
+                then: {
+                  $ifNull: [
+                    { $arrayElemAt: ["$membershipInfo.name", 0] },
+                    "Premium Subscription",
+                  ],
+                },
+                else: {
+                  $cond: {
+                    if: { $ne: ["$membershipPackage", "free"] },
+                    then: {
+                      $switch: {
+                        branches: [
+                          {
+                            case: { $eq: ["$membershipPackage", "basic"] },
+                            then: "Basic Plan",
+                          },
+                          {
+                            case: { $eq: ["$membershipPackage", "premium"] },
+                            then: "Premium Plan",
+                          },
+                          {
+                            case: { $eq: ["$membershipPackage", "vip"] },
+                            then: "VIP Plan",
+                          },
+                        ],
+                        default: "$membershipPackage",
+                      },
+                    },
+                    else: "Free Users",
+                  },
+                },
+              },
+            },
+          },
+        },
+      ];
+
       // Thống kê tổng quan
       const overallStats = await Rating.aggregate([
-        { $match: dateFilter },
+        ...pipeline,
         {
           $group: {
             _id: null,
@@ -127,7 +204,7 @@ const adminRatingController = {
 
       // Thống kê theo aspect
       const aspectStats = await Rating.aggregate([
-        { $match: dateFilter },
+        ...pipeline,
         {
           $group: {
             _id: "$aspectRated",
@@ -138,12 +215,12 @@ const adminRatingController = {
         { $sort: { average: -1 } },
       ]);
 
-      // Thống kê theo membership
+      // Enhanced membership stats với real names
       const membershipStats = await Rating.aggregate([
-        { $match: dateFilter },
+        ...pipeline,
         {
           $group: {
-            _id: "$membershipPackage",
+            _id: "$membershipCategory",
             count: { $sum: 1 },
             average: { $avg: "$rating" },
           },
@@ -203,7 +280,7 @@ const adminRatingController = {
                 : "0%",
           },
           aspectStats,
-          membershipStats,
+          membershipStats, // Now contains real membership names
           distribution: {
             1: distribution.find((d) => d._id === 1)?.count || 0,
             2: distribution.find((d) => d._id === 2)?.count || 0,
@@ -215,6 +292,7 @@ const adminRatingController = {
         },
       });
     } catch (error) {
+      console.error("Admin dashboard error:", error);
       res.status(500).json({
         status: "ERR",
         message: error.message,
@@ -222,7 +300,7 @@ const adminRatingController = {
     }
   },
 
-  // Export ratings data (CSV)
+  // Enhanced export với subscription data
   exportRatings: async (req, res) => {
     try {
       const { dateFrom, dateTo } = req.query;
@@ -236,18 +314,27 @@ const adminRatingController = {
 
       const ratings = await Rating.find(query)
         .populate("user", "name email")
+        .populate({
+          path: "subscription",
+          populate: {
+            path: "membershipId",
+            select: "name type price",
+          },
+        })
         .sort({ createdAt: -1 });
 
-      // Format cho CSV
+      // Enhanced CSV data với subscription info
       const csvData = ratings.map((r) => ({
-        "User Name": r.user.name,
-        "User Email": r.user.email,
+        "User Name": r.user?.name || "Unknown",
+        "User Email": r.user?.email || "Unknown",
         Rating: r.rating,
         Aspect: r.aspectRated,
-        Comment: r.comment,
-        Membership: r.membershipPackage,
+        Comment: r.comment || "",
+        "Membership Type":
+          r.subscription?.membershipId?.name || r.membershipPackage || "Free",
+        "Subscription Status": r.subscription?.status || "N/A",
         "Would Recommend": r.wouldRecommend ? "Yes" : "No",
-        "Days Used": r.daysUsed,
+        "Days Used": r.daysUsed || 0,
         "Created Date": new Date(r.createdAt).toLocaleDateString(),
         "Created Time": new Date(r.createdAt).toLocaleTimeString(),
       }));
@@ -258,6 +345,30 @@ const adminRatingController = {
         data: csvData,
       });
     } catch (error) {
+      console.error("Admin export error:", error);
+      res.status(500).json({
+        status: "ERR",
+        message: error.message,
+      });
+    }
+  },
+
+  // New method: Lấy thống kê chi tiết cho admin
+  getDetailedStats: async (req, res) => {
+    try {
+      // Sử dụng existing platform stats
+      const platformStats = await RatingService.getPlatformStats(req.query);
+      const membershipStats = await RatingService.getStatsByMembership();
+
+      res.json({
+        status: "OK",
+        data: {
+          platform: platformStats,
+          membership: membershipStats,
+        },
+      });
+    } catch (error) {
+      console.error("Admin detailed stats error:", error);
       res.status(500).json({
         status: "ERR",
         message: error.message,
