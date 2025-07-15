@@ -1251,11 +1251,37 @@ const updateQuitPlan = async (planId, userId, updates) => {
                     if (existingStage) {
                         if (existingStage.status === "completed") {
                             // Stage đã hoàn thành - không được phép chỉnh sửa
-                            invalidUpdates.push({
-                                stageId: updateStage._id,
-                                title: existingStage.title,
-                                reason: "Giai đoạn đã hoàn thành - không thể chỉnh sửa"
-                            });
+                            // invalidUpdates.push({
+                            //     stageId: updateStage._id,
+                            //     title: existingStage.title,
+                            //     reason: "Giai đoạn đã hoàn thành - không thể chỉnh sửa"
+                            // });
+                            // console.log(`⏭️ Bỏ qua stage đã hoàn thành: ${existingStage.title}`);
+                            const hasChanges = (
+                                (updateStage.title && updateStage.title !== existingStage.title) ||
+                                (updateStage.description && updateStage.description !== existingStage.description) ||
+                                (updateStage.daysToComplete && updateStage.daysToComplete !== existingStage.daysToComplete)
+                            );
+                            if (hasChanges) {
+                                invalidUpdates.push({
+                                    stageId: updateStage._id,
+                                    title: existingStage.title,
+                                    reason: "Giai đoạn đã hoàn thành - không thể chỉnh sửa"
+                                });
+                            } else {
+                                console.log(`✅ Stage đã hoàn thành nhưng không có thay đổi: ${existingStage.title}`);
+
+                                // Thêm vào danh sách để giữ nguyên
+                                stagesToKeep.push({
+                                    _id: existingStage._id,
+                                    title: existingStage.title,
+                                    description: existingStage.description,
+                                    orderNumber: existingStage.orderNumber,
+                                    daysToComplete: existingStage.daysToComplete,
+                                    reason: "Đã hoàn thành - giữ nguyên (không có thay đổi)"
+                                });
+                            }
+                            return; // Skip stage này, không add vào invalidUpdates
                         } else if (existingStage.status === "in_progress") {
                             // Stage đang thực hiện - chỉ cho phép sửa title và description
                             if (updateStage.daysToComplete && updateStage.daysToComplete !== existingStage.daysToComplete) {
@@ -1429,7 +1455,7 @@ const updateQuitPlan = async (planId, userId, updates) => {
                 }
             },
             message: updates.stages && updates.stages.length > 0 ?
-                `Cập nhật kế hoạch thành công. ${validStageIdsToDelete.length > 0 ? `Đã xóa ${validStageIdsToDelete.length} giai đoạn. ` : ''}Thứ tự giai đoạn đã được tự động sắp xếp lại. Ngày hoàn thành đã được tự động tính toán lại.` :
+                `Cập nhật kế hoạch thành công. ${validStageIdsToDelete.length > 0 ? `Đã xóa ${validStageIdsToDelete.length} giai đoạn. ` : ''} Ngày hoàn thành đã được tự động tính toán lại.` :
                 "Cập nhật kế hoạch thành công"
         };
 
