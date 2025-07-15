@@ -69,6 +69,92 @@ exports.deleteAchievement = async (id) => {
   return deleted;
 };
 
+// exports.evaluateAndGrantAchievements = async (userId) => {
+//   if (!mongoose.Types.ObjectId.isValid(userId)) {
+//     throw new Error("Invalid userId.");
+//   }
+
+//   const user = await UserModel.findById(userId);
+//   if (!user) {
+//     throw new Error("User not found.");
+//   }
+
+//   if (user.isAdmin || user.isCoach) {
+//     throw new Error("Admin or coach cannot receive achievements.");
+//   }
+
+//   const smokingStatus = await SmokingStatusModel.findOne({ userId });
+//   if (!smokingStatus) {
+//     throw new Error(
+//       "Smoking status not found. Please set your smoking status."
+//     );
+//   }
+
+//   const progressLogs = await ProgressLogsModel.find({ userId }).sort({
+//     date: 1,
+//   });
+
+//   // Tính toán các chỉ số
+//   let consecutiveSmokeFreeDays = 0;
+//   let totalSmokeFreeDays = 0;
+//   let totalMoneySaved = 0;
+//   let totalCigarettesNotSmoked = 0;
+
+//   let previousDate = null;
+
+//   for (const log of progressLogs) {
+//     if (log.cigarettesPerDay === 0) {
+//       if (
+//         previousDate &&
+//         new Date(log.date).toDateString() ===
+//           new Date(previousDate.getTime() + 86400000).toDateString()
+//       ) {
+//         consecutiveSmokeFreeDays++;
+//       } else {
+//         consecutiveSmokeFreeDays = 1;
+//       }
+
+//       totalSmokeFreeDays++;
+//       totalMoneySaved +=
+//         smokingStatus.cigarettesPerDay * smokingStatus.pricePerCigarette;
+//       totalCigarettesNotSmoked += smokingStatus.cigarettesPerDay;
+//     } else {
+//       consecutiveSmokeFreeDays = 0;
+//     }
+
+//     previousDate = new Date(log.date);
+//   }
+
+//   // Lấy danh sách achievement chưa được cấp
+//   const grantedIds = user.grantedAchievements.map((id) => id.toString());
+//   const achievements = await AchievementsModel.find();
+
+//   const newAchievements = [];
+
+//   for (const achievement of achievements) {
+//     if (grantedIds.includes(achievement._id.toString())) continue;
+
+//     if (
+//       (achievement.name.includes("1-Day") && consecutiveSmokeFreeDays >= 1) ||
+//       (achievement.name.includes("7-Day") && consecutiveSmokeFreeDays >= 7) ||
+//       (achievement.name.includes("30-Day") && consecutiveSmokeFreeDays >= 30) ||
+//       (achievement.name.includes("100.000vnđ") && totalMoneySaved >= 100000) ||
+//       (achievement.name.includes("500.000vnđ") && totalMoneySaved >= 500000) ||
+//       (achievement.name.includes("100 Cigarettes") &&
+//         totalCigarettesNotSmoked >= 100)
+//     ) {
+//       user.grantedAchievements.push(achievement._id);
+//       newAchievements.push(achievement);
+//     }
+//   }
+
+//   if (newAchievements.length > 0) {
+//     await user.save();
+//   }
+
+//   return newAchievements;
+// };
+
 exports.evaluateAndGrantAchievements = async (userId) => {
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error("Invalid userId.");
@@ -102,28 +188,42 @@ exports.evaluateAndGrantAchievements = async (userId) => {
 
   let previousDate = null;
 
+  // ✅ Lấy số điếu ban đầu từ smoking status
+  const originalCigarettesPerDay = smokingStatus.cigarettesPerDay;
+  const pricePerCigarette = smokingStatus.pricePerCigarette;
+
   for (const log of progressLogs) {
+    // ✅ FIX: Tính số điếu đã bỏ được cho mỗi ngày
+    const savedCigarettes = Math.max(0, originalCigarettesPerDay - log.cigarettesPerDay);
+    totalCigarettesNotSmoked += savedCigarettes;
+    totalMoneySaved += savedCigarettes * pricePerCigarette;
+
+    // Logic tính consecutive smoke-free days
     if (log.cigarettesPerDay === 0) {
       if (
         previousDate &&
         new Date(log.date).toDateString() ===
-          new Date(previousDate.getTime() + 86400000).toDateString()
+        new Date(previousDate.getTime() + 86400000).toDateString()
       ) {
         consecutiveSmokeFreeDays++;
       } else {
         consecutiveSmokeFreeDays = 1;
       }
-
       totalSmokeFreeDays++;
-      totalMoneySaved +=
-        smokingStatus.cigarettesPerDay * smokingStatus.pricePerCigarette;
-      totalCigarettesNotSmoked += smokingStatus.cigarettesPerDay;
     } else {
       consecutiveSmokeFreeDays = 0;
     }
 
     previousDate = new Date(log.date);
   }
+
+  console.log(`🔍 Achievement Debug cho user ${userId}:`);
+  console.log(`📊 Original cigarettes/day: ${originalCigarettesPerDay}`);
+  console.log(`💰 Price per cigarette: ${pricePerCigarette}`);
+  console.log(`🚭 Total cigarettes not smoked: ${totalCigarettesNotSmoked}`);
+  console.log(`💵 Total money saved: ${totalMoneySaved}đ`);
+  console.log(`🔥 Consecutive smoke-free days: ${consecutiveSmokeFreeDays}`);
+  console.log(`📅 Total smoke-free days: ${totalSmokeFreeDays}`);
 
   // Lấy danh sách achievement chưa được cấp
   const grantedIds = user.grantedAchievements.map((id) => id.toString());
@@ -134,17 +234,31 @@ exports.evaluateAndGrantAchievements = async (userId) => {
   for (const achievement of achievements) {
     if (grantedIds.includes(achievement._id.toString())) continue;
 
-    if (
-      (achievement.name.includes("1-Day") && consecutiveSmokeFreeDays >= 1) ||
-      (achievement.name.includes("7-Day") && consecutiveSmokeFreeDays >= 7) ||
-      (achievement.name.includes("30-Day") && consecutiveSmokeFreeDays >= 30) ||
-      (achievement.name.includes("100.000vnđ") && totalMoneySaved >= 100000) ||
-      (achievement.name.includes("500.000vnđ") && totalMoneySaved >= 500000) ||
-      (achievement.name.includes("100 Cigarettes") &&
-        totalCigarettesNotSmoked >= 100)
-    ) {
+    let qualified = false;
+
+    if (achievement.name.includes("1-Day") && consecutiveSmokeFreeDays >= 1) {
+      qualified = true;
+    } else if (achievement.name.includes("7-Day") && consecutiveSmokeFreeDays >= 7) {
+      qualified = true;
+    } else if (achievement.name.includes("30-Day") && consecutiveSmokeFreeDays >= 30) {
+      qualified = true;
+    } else if (achievement.name.includes("100.000vnđ") && totalMoneySaved >= 100000) {
+      qualified = true;
+    } else if (achievement.name.includes("500.000vnđ") && totalMoneySaved >= 500000) {
+      qualified = true;
+    } else if (achievement.name.includes("100 Cigarettes") && totalCigarettesNotSmoked >= 100) {
+      qualified = true;
+    }
+
+    if (qualified) {
+      console.log(`🏆 Qualified for achievement: ${achievement.name}`);
       user.grantedAchievements.push(achievement._id);
       newAchievements.push(achievement);
+    } else {
+      console.log(`❌ Not qualified for achievement: ${achievement.name}`);
+      if (achievement.name.includes("100.000vnđ")) {
+        console.log(`   Need: 100,000đ, Have: ${totalMoneySaved}đ`);
+      }
     }
   }
 
@@ -179,10 +293,10 @@ exports.getTopUsersByAchievements = async (limit = 5) => {
   });
 
   // Sắp xếp theo tổng điểm giảm dần và lấy top N
- const sortedUsers = usersWithPoints
-  .filter((u) => u.totalPoints > 0)
-  .sort((a, b) => b.totalPoints - a.totalPoints)
-  .slice(0, limit);
+  const sortedUsers = usersWithPoints
+    .filter((u) => u.totalPoints > 0)
+    .sort((a, b) => b.totalPoints - a.totalPoints)
+    .slice(0, limit);
 
   return sortedUsers;
 };
