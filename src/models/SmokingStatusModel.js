@@ -7,6 +7,7 @@ const smokingStatusSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "users",
       required: true,
+      unique: true,
     },
     cigarettesPerDay: {
       type: Number,

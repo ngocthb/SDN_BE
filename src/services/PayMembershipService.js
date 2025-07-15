@@ -7,7 +7,7 @@ const mongoose = require("mongoose");
 const UserModel = require("../models/UserModel");
 
 exports.createOrderAndBuildPaymentUrl = async (data, ipAddress) => {
-  const { userId, membershipId } = data;
+  const { userId, membershipId, mode = "register" } = data;
 
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error("Invalid userId.");
@@ -26,43 +26,45 @@ exports.createOrderAndBuildPaymentUrl = async (data, ipAddress) => {
     throw new Error("Membership not found.");
   }
 
-  const existingActiveSubscription = await SubscriptionModel.findOne({
-    userId: userId,
-    status: "active",
-  }).populate("membershipId", "name price duration");
+  if (mode === "register") {
+    const existingActiveSubscription = await SubscriptionModel.findOne({
+      userId,
+      status: "active",
+    }).populate("membershipId", "name price duration");
 
-  if (existingActiveSubscription) {
-    const endDate = new Date(existingActiveSubscription.endDate);
-    const remainingDays = Math.ceil(
-      (endDate - new Date()) / (1000 * 60 * 60 * 24)
-    );
+    if (existingActiveSubscription) {
+      const endDate = new Date(existingActiveSubscription.endDate);
+      const remainingDays = Math.ceil(
+        (endDate - new Date()) / (1000 * 60 * 60 * 24)
+      );
 
-    throw new Error(
-      `Bạn đã có gói đăng ký "${
-        existingActiveSubscription.membershipId.name
-      }" đang hoạt động. Gói này sẽ hết hạn vào ${endDate.toLocaleDateString(
-        "vi-VN"
-      )} (còn ${remainingDays} ngày). Vui lòng chờ gói hiện tại hết hạn hoặc hủy gói hiện tại trước khi đăng ký gói mới.`
-    );
+      throw new Error(
+        `Bạn đã có gói "${
+          existingActiveSubscription.membershipId.name
+        }" đang hoạt động. Gói sẽ hết hạn vào ${endDate.toLocaleDateString(
+          "vi-VN"
+        )} (còn ${remainingDays} ngày). Vui lòng chờ hoặc hủy trước khi đăng ký mới.`
+      );
+    }
   }
 
   const orderId = `${uuidv4()}_${membershipId}_${userId}`;
-
   const amount = membership.price;
-
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const expireDate = new Date(Date.now() + 15 * 60 * 1000); // 15 phút
 
   const paymentUrl = vnpay.buildPaymentUrl({
     vnp_Amount: amount,
     vnp_IpAddr: ipAddress,
     vnp_TxnRef: orderId,
-    vnp_OrderInfo: `Thanh toan membership ${membershipId}`,
+    vnp_OrderInfo:
+      mode === "renew"
+        ? `Gia hạn gói thành viên ${membershipId}`
+        : `Thanh toán membership ${membershipId}`,
     vnp_OrderType: ProductCode.Other,
-    vnp_ReturnUrl: "http://localhost:3000/vnpay-return", //Fe change
+    vnp_ReturnUrl: "http://localhost:5173/user/payment/success",
     vnp_Locale: VnpLocale.VN,
     vnp_CreateDate: dateFormat(new Date()),
-    vnp_ExpireDate: dateFormat(tomorrow),
+    vnp_ExpireDate: dateFormat(expireDate),
   });
 
   return {

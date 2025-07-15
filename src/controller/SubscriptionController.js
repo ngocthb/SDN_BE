@@ -99,12 +99,8 @@ exports.deleteSubscription = async (req, res) => {
 exports.extendSubscription = async (req, res) => {
   try {
     const { id } = req.params;
-    const { newEndDate } = req.body;
 
-    const updated = await subscriptionService.extendSubscription(
-      id,
-      newEndDate
-    );
+    const updated = await subscriptionService.extendSubscription(id);
 
     return res.status(200).json({
       success: true,
@@ -149,7 +145,7 @@ exports.getMySubscription = async (req, res) => {
     return res.status(200).json({
       success: true,
       data: result,
-      message: result.message
+      message: result.message,
     });
   } catch (error) {
     console.error("Error fetching my subscription:", error);
@@ -175,7 +171,7 @@ exports.getMySubscriptionHistory = async (req, res) => {
       success: true,
       data: result.subscriptions,
       pagination: result.pagination,
-      message: "Lấy lịch sử subscription thành công"
+      message: "Lấy lịch sử subscription thành công",
     });
   } catch (error) {
     console.error("Error fetching my subscription history:", error);

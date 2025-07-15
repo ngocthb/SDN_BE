@@ -2,6 +2,7 @@ const QuitPlansModel = require("../models/QuitPlansModel");
 const PlanStagesModel = require("../models/PlanStagesModel");
 const SmokingStatusModel = require("../models/SmokingStatusModel");
 const UserModel = require("../models/UserModel");
+const ProgressLogsModel = require("../models/ProgressLogsModel");
 const nodemailer = require("nodemailer");
 const SubscriptionService = require("./SubscriptionService");
 
@@ -1705,6 +1706,23 @@ const cancelPlan = async (planId, userId) => {
             return {
                 success: false,
                 message: "Không tìm thấy kế hoạch đang thực hiện"
+            };
+        }
+
+        const existingProgressLogs = await ProgressLogsModel.findOne({
+            quitPlanId: planId,
+            userId: userId
+        });
+
+        if (existingProgressLogs) {
+            return {
+                success: false,
+                message: "Không thể hủy kế hoạch vì đã có dữ liệu tiến độ được ghi nhận. Bạn có thể hoàn thành kế hoạch thay vì hủy bỏ.",
+                data: {
+                    hasProgressLogs: true,
+                    planId: planId,
+                    suggestion: "Sử dụng chức năng 'Hoàn thành kế hoạch' để kết thúc kế hoạch một cách chính thức."
+                }
             };
         }
 
